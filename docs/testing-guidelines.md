@@ -75,7 +75,11 @@ The developer's current machine (Linux x86_64) resolves to
   per suite, reference-capture `[&]` to reach outer state. Shared state
   must live at **file scope** (`static`), not as a local of the `describe`
   lambda: `describe` returns before the tests run, so `[&]` on its locals
-  dangles (the binary then exits 1 with no output).
+  dangles (the binary then exits 1 with no output). Hooks that destroy
+  shared objects must also reset the pointers to `nullptr`, or the next
+  test's `afterEach` double-frees. An ASan abort inside a test binary is
+  likewise reported only as a silent exit 1; bisect with
+  `build/test_<name> -g "<case>"`.
 - **Focus/skip** - `fit`/`xit`, `fdescribe`/`xdescribe`, `todo(...)`.
 - **Parametrized** - `withParameter<T>().withValue(...).thenDo([](T x){...})`
   for table-driven cases.
