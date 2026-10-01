@@ -18,5 +18,7 @@ const Transform *Skeleton_RestGlobal(const Skeleton *self, size_t joint);
 const Transform *Skeleton_ParentOffset(const Skeleton *self, size_t joint);
 size_t Skeleton_FindJoint(const Skeleton *self, const char *name);
 size_t Skeleton_FindJointByNode(const Skeleton *self, size_t node);
+void Skeleton_SetRestLocal(Skeleton *self, size_t joint, const Transform *rest_local);
+void Skeleton_SetRootOffset(Skeleton *self, const Transform *offset);
 size_t Skeleton_ChildCount(const Skeleton *self, size_t joint);
 size_t Skeleton_Child(const Skeleton *self, size_t joint, size_t child);

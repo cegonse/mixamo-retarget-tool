@@ -212,3 +212,30 @@ size_t Skeleton_Child(const Skeleton *self, size_t joint, size_t child) {
   }
   return SKELETON_NO_JOINT;
 }
+
+static void recomputeGlobals(Skeleton *self) {
+  size_t index;
+  for (index = 0; index < self->joint_count; index++) {
+    Joint *joint = &self->joints[index];
+    Transform_Compose(&joint->parent_offset, &joint->rest_local, &joint->rest_global);
+    if (joint->parent != SKELETON_NO_JOINT) {
+      Transform_Compose(&self->joints[joint->parent].rest_global, &joint->rest_global,
+        &joint->rest_global);
+    }
+  }
+}
+
+void Skeleton_SetRestLocal(Skeleton *self, size_t joint, const Transform *rest_local) {
+  self->joints[joint].rest_local = *rest_local;
+  recomputeGlobals(self);
+}
+
+void Skeleton_SetRootOffset(Skeleton *self, const Transform *offset) {
+  size_t joint;
+  for (joint = 0; joint < self->joint_count; joint++) {
+    if (self->joints[joint].parent == SKELETON_NO_JOINT) {
+      self->joints[joint].parent_offset = *offset;
+    }
+  }
+  recomputeGlobals(self);
+}
