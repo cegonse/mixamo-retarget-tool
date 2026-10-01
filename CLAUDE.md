@@ -106,6 +106,7 @@ make               # build/anim-retarget (json-c built from third_party/)
 make test          # build tool + test binaries, run cest-runner build/
 make web           # Emscripten build of the browser tool into build-web/ (emcc on PATH)
 make web-serve     # serve build-web/ on http://localhost:8080
+make web-dist      # build-web/dist/: only the deployable files
 ```
 
 Conventions (full detail in `docs/development-guidelines.md`): C99, libc

@@ -34,6 +34,7 @@ web-tool/
 make init-web      # fetch raylib 6.0 WebAssembly release into external/raylib (once)
 make web           # emcmake cmake -S web-tool -B build-web && build
 make web-serve     # python3 -m http.server --directory build-web 8080
+make web-dist      # copy only the deployable files into build-web/dist/
 ```
 
 `emcc`/`emcmake` must be on `PATH` (`source <emsdk>/emsdk_env.sh`); the
@@ -41,6 +42,15 @@ build was verified with Emscripten 5.0.4. `build-web/` holds
 `anim-retarget-web.js` + `.wasm`, the page files and `mappings/` (copied
 from `docs/mappings/` after every build). The page must be served over
 HTTP (file URLs cannot load the `.wasm` fetch).
+
+**Deploying.** `make web-dist` wipes and refills `build-web/dist/` with
+exactly what a static host needs: `index.html`, `app.js`, `style.css`,
+`anim-retarget-web.js`, `anim-retarget-web.wasm` and `mappings/*.map`.
+Keep that relative layout (the loader fetches the `.wasm` next to its
+`.js`, the page fetches `mappings/` relative to itself) and serve
+`.wasm` as `application/wasm` (otherwise the browser falls back to a
+slower non-streaming instantiation). No special headers are needed; the
+build uses no threads.
 
 ## Layout
 

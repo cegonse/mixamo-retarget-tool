@@ -66,6 +66,7 @@ tick the tracks, edit the bone map and options, export.
 make init-web  # raylib 6.0 WebAssembly release into external/ (needs emcc on PATH)
 make web       # build-web/
 make web-serve # http://localhost:8080
+make web-dist  # build-web/dist/: the files to put on a static host
 ```
 
 See [docs/web-tool.md](docs/web-tool.md).
