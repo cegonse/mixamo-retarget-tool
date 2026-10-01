@@ -26,12 +26,13 @@ Full CLI in `docs/cli.md`.
 |-----|----------------|--------------|
 | `PLAN.md` | Phases, one commit each, and the commit protocol | starting any work |
 | `docs/development-guidelines.md` | C99 conventions, style, opaque-struct modules, memory rules, layout, `init.sh` | writing any code |
+| `docs/libraries.md` | cgltf / cglm / json-c: versions, the calls we use, the "don't reimplement" table | touching I/O or math |
 | `docs/testing-guidelines.md` | Cest setup, CMake per-file pattern, unit/acceptance expectations, seams | the test suite |
 | `docs/cest-reference.md` | Cest v5 API surface | writing tests |
 | `docs/glb-subset.md` | GLB container, the glTF properties read/written, output shape, **fixture facts** | the loader/writer |
 | `docs/retargeting.md` | **The core spec**: sampling, frame alignment, rest correction, rotation/translation retarget | the retargeter |
 | `docs/cli.md` | Commands, flags, output text, exit codes | `args`/`app` |
-| `docs/mappings/*.map` | Maintained bone maps (Mixamo identity; UAL → Mixamo draft) | acceptance tests, phase 11 |
+| `docs/mappings/*.map` | Maintained bone maps (Mixamo identity; UAL → Mixamo draft) | acceptance tests, phase 9 |
 
 ## Commit protocol — VERY IMPORTANT
 
@@ -45,9 +46,14 @@ Full CLI in `docs/cli.md`.
 
 ## Locked decisions (don't relitigate)
 
-- **No third-party source.** JSON parser/writer, GLB framing and the
-  vector/quaternion/matrix math are written in-house; they are small.
-  Only `libm` is linked.
+- **Three vendored libraries, pinned submodules in `third_party/`:**
+  **cgltf** reads GLB/glTF (container, JSON, accessors), **json-c**
+  builds and serialises the output JSON, **cglm** does all vector/
+  quaternion/matrix math (header-only). `cgltf_write.h` is not used.
+  System-packaged libraries (zlib, cairo, …) are fine when needed; record
+  them in `docs/libraries.md`. In-house code is limited to the ~30-line
+  GLB framing on write, the Horn/Jacobi solve, keyframe sampling and the
+  retargeting itself.
 - **Minimal glTF subset.** Nodes, skins, animations, accessors,
   bufferViews, the embedded BIN buffer. Meshes, materials, textures,
   cameras, lights, extensions: ignored on read, never written.
@@ -77,25 +83,28 @@ Full CLI in `docs/cli.md`.
    three sanity checks listed there; the unit tests encode them.
 3. **GLB writer details**: 4-byte chunk padding (spaces for JSON, zeros
    for BIN), `min`/`max` on every animation input accessor, `%.9g`
-   floats, sign-continuous quaternions, no NaN ever written.
+   floats through `json_object_new_double_s`, sign-continuous
+   quaternions, no NaN ever written. Every produced file must parse back
+   with cgltf and pass `cgltf_validate`.
 
 Known footgun: `UAL1_Standard_RM.glb` in `test/data/` is currently a
 duplicate of the destination model, not the animation library
-(`docs/glb-subset.md` §5). Phases 0–10 don't need it; phase 11 does.
+(`docs/glb-subset.md` §5). Phases 0–8 don't need it; phase 9 does.
 
 ## Build
 
 CMake, C99, out-of-source; the `Makefile` is a thin wrapper.
 
 ```
-make init          # fetch Cest header + runner into external/ (once)
-make               # build/anim-retarget
+make init          # git submodule update --init; fetch Cest into external/ (once)
+make               # build/anim-retarget (json-c built from third_party/)
 make test          # build tool + test binaries, run cest-runner build/
 ```
 
 Conventions (full detail in `docs/development-guidelines.md`): C99, libc
 first; opaque-struct modules (`TypeName_Method(self, …)`, `#pragma once`,
-headers included as `<name.h>`); small math value types by value; prefer
+headers included as `<name.h>`); cglm array types with `dest`
+out-parameters for math; prefer
 static/stack over heap, and every heap allocation gets a matching
 destructor and a test; no comments in source; short functions (~15–20
 lines) and files (~150 lines).
@@ -126,7 +135,9 @@ external/cest/cest-runner build/ --grep retarget
 
 - Don't add mesh/material support "while you're there".
 - Don't change the output shape away from `sword_run.glb`'s without an
-  in-engine reason recorded in `PLAN.md` phase 11.
-- Don't vendor libraries; don't add dependencies beyond libm, CMake and
-  the downloaded Cest.
+  in-engine reason recorded in `PLAN.md` phase 9.
+- Don't hand-parse JSON/GLB, hand-roll quaternion math or hand-format
+  JSON: cgltf, cglm and json-c do those. Don't edit anything under
+  `third_party/`; don't add a fourth library without a `libraries.md`
+  entry.
 - Keep `main.c` a one-liner; put logic in `App_Run`.

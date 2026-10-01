@@ -2,8 +2,10 @@
 
 What the tool reads from a GLB, what it writes, and the hard facts about
 the three fixtures in `test/data/`. Spec reference:
-https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html . Everything
-not listed here is **ignored on read and never written**.
+https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html . Reading is
+done by **cgltf**, writing by **json-c** plus ~30 lines of in-house GLB
+framing (`libraries.md`). Everything not listed here is **ignored on read
+and never written**.
 
 ## 1. GLB container
 
@@ -20,11 +22,14 @@ offset  size  field
   to a multiple of 4. Optional on read (a JSON-only GLB is valid but useless
   here: error out if animation data is needed and no BIN exists).
 - All integers little-endian. All floats IEEE-754 `float32`.
-- Read: reject bad magic, version ≠ 2, chunk overflowing `length`, first
-  chunk not JSON, unknown chunk types after the first two (ignore).
-- Write: exactly the two chunks above; `length` computed last.
+- Read: `cgltf_parse_file` + `cgltf_load_buffers` + `cgltf_validate` do
+  all of this; the tool only maps a failing `cgltf_result` to
+  `ERR_BAD_GLB` and names it.
+- Write (in-house, `glb_writer`): exactly the two chunks above; the JSON
+  text comes from json-c (`JSON_C_TO_STRING_PLAIN`); `length` computed
+  last.
 
-## 2. JSON properties read
+## 2. glTF properties used (through `cgltf_data`)
 
 | Object | Properties used | Notes |
 |--------|-----------------|-------|
@@ -33,25 +38,23 @@ offset  size  field
 | `nodes[]` | `name`, `children`, `translation`, `rotation`, `scale`, `matrix`, `skin`, `mesh` | `matrix` → decomposed to TRS (error if the 3×3 has shear, i.e. columns not orthogonal within 1e-4); `mesh`/`skin` only used to recognise mesh nodes to skip |
 | `skins[]` | `name`, `joints`, `inverseBindMatrices`, `skeleton` | IBMs decoded to 16 floats each (MAT4, column-major) |
 | `animations[]` | `name`, `channels[].sampler`, `channels[].target.node`, `channels[].target.path`, `samplers[].input`, `samplers[].output`, `samplers[].interpolation` | paths `translation`/`rotation`/`scale`; `weights` channels ignored with a note |
-| `accessors[]` | `bufferView`, `byteOffset`, `componentType`, `count`, `type`, `normalized`, `min`, `max` | `sparse` → unsupported error |
-| `bufferViews[]` | `buffer`, `byteOffset`, `byteLength`, `byteStride` | `buffer` must be 0 |
-| `buffers[]` | `byteLength`, `uri` | `uri` present → unsupported error (only the embedded BIN chunk) |
+| `accessors[]` | everything cgltf needs; the tool reads only through `cgltf_accessor_read_float` / `cgltf_accessor_unpack_floats` | strides, normalised ints and sparse accessors are cgltf's job |
+| `bufferViews[]`, `buffers[]` | resolved by `cgltf_load_buffers` | external `.bin` and data URIs load too; a GLB with no BIN and no URI fails as `ERR_BAD_GLB` |
 
 Defaults per spec: `translation` `[0,0,0]`, `rotation` `[0,0,0,1]`,
 `scale` `[1,1,1]`, `byteOffset` 0, `interpolation` `"LINEAR"`.
 
-Component types to decode: `5126` float (always for translation/scale,
-inputs, IBMs); rotation outputs may also be normalized `5120` byte,
-`5121` ubyte, `5122` short, `5123` ushort (decode per spec:
-`max(c / 127.0, -1.0)`, `c / 255.0`, `max(c / 32767.0, -1.0)`,
-`c / 65535.0`). Accessor element types: `SCALAR`, `VEC3`, `VEC4`, `MAT4`.
-`byteStride` honoured when present.
+Accessor element types the tool expects: `SCALAR` (inputs), `VEC3`
+(translation, scale), `VEC4` (rotation), `MAT4` (inverse bind matrices);
+anything else on an animation sampler or skin is `ERR_BAD_GLB`.
 
 CUBICSPLINE samplers store 3 output elements per key (in-tangent, value,
 out-tangent); see `retargeting.md` §2 for evaluation.
 
-Quaternions are stored `(x, y, z, w)`. Matrices are column-major. The
-node's local matrix is `T · R · S`.
+Quaternions are stored `(x, y, z, w)` — the same layout as cglm's
+`versor`. Matrices are column-major — the same as cglm's `mat4` and
+`cgltf_node_transform_local/world`. The node's local matrix is
+`T · R · S`.
 
 ## 3. The armature
 
@@ -105,11 +108,14 @@ which is known to load in the engine:
 - Time grid starts at `0` and advances by `1/fps` (see `retargeting.md`
   §2). Note: Blender writes the first key at `1/30 s` (frame 1), which the
   engine tolerates; starting at 0 is standard and must be verified
-  in-engine once (`PLAN.md` phase 11).
+  in-engine once (`PLAN.md` phase 9).
 - No `meshes`, `materials`, `textures`, `images`, `samplers`,
   `extensionsUsed`.
-- Floats printed with `%.9g` (round-trip safe for float32); `-0` is fine;
-  `NaN`/`Inf` must never reach the writer (assert upstream).
+- Floats serialised by json-c with `%.9g` (`json_object_new_double_s`,
+  round-trip safe for float32); `-0` is fine; `NaN`/`Inf` must never reach
+  the writer (assert finite upstream).
+- Acceptance check: every produced file parses with cgltf and passes
+  `cgltf_validate`.
 - Output path: `<out-dir>/<track>.glb` where `<track>` is the source track
   name with every character outside `[A-Za-z0-9._-]` replaced by `_`;
   `--out <file>` overrides when exactly one track is converted.
@@ -177,6 +183,6 @@ dozens of named tracks on a UE5-Mannequin-style skeleton (`root`,
 after glTF export, metre-scale units.
 
 **Action for the user:** replace `test/data/UAL1_Standard_RM.glb` with the
-real export before `PLAN.md` phase 11. Until then every phase is testable
+real export before `PLAN.md` phase 9. Until then every phase is testable
 with the other two fixtures plus synthetic transforms (see
 `testing-guidelines.md`).

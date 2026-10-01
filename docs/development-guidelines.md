@@ -2,8 +2,9 @@
 
 Conventions for `anim-retarget`, a single C command-line tool that
 retargets skeletal animation from a source GLB to a destination GLB. One
-Bash script sits around it (`scripts/init.sh`) to fetch the test
-framework. See `glb-subset.md` for what the tool reads and writes and
+Bash script sits around it (`scripts/init.sh`) to initialise the vendored
+libraries and fetch the test framework. See `libraries.md` for the
+libraries, `glb-subset.md` for what the tool reads and writes and
 `retargeting.md` for what it actually computes.
 
 ## Scope reminder
@@ -30,9 +31,12 @@ the tool focused; resist pulling asset-pipeline concerns into it.
   `libm`.
 - **No non-portable calls** unless wrapped and justified. Nothing that
   ties the build to a single OS.
-- **No third-party source.** JSON parsing/writing, GLB framing and the
-  math are written in-house (they are small; see `glb-subset.md`). Do not
-  vendor cgltf, jsmn, cJSON or similar.
+- **Third-party code: the three vendored libraries only** — cgltf (read
+  glTF), cglm (math), json-c (write JSON) — as git submodules under
+  `third_party/`, plus system-wide packaged libraries (zlib, cairo, …)
+  when a real need appears. Every library is recorded in `libraries.md`
+  with its role; don't add one silently and don't reimplement what they
+  already do.
 - **CMake** for the build (`cmake_minimum_required(VERSION 3.22)`).
   Out-of-source builds. A thin `Makefile` orchestrates `init`/`all`/`test`.
 
@@ -95,8 +99,8 @@ the tool focused; resist pulling asset-pipeline concerns into it.
   (`target_include_directories`) so headers resolve globally. This applies
   to the project's own headers too.
 - **Floating point is `float`** for everything stored (glTF stores
-  `float32`); intermediate math may widen to `double` where it helps the
-  Procrustes solve, but keep conversions explicit.
+  `float32`) and for all cglm calls; the in-house Procrustes/Jacobi solve
+  may widen to `double` internally, with explicit conversions at its edge.
 
 ## Module pattern — opaque structs
 
@@ -105,19 +109,18 @@ type name and functions; the definition lives in the `.c` file. This keeps
 internals private and gives every module a clear surface.
 
 ```c
-// glb_file.h
+// gltf_doc.h
 #pragma once
 #include <error_code.h>
 #include <stddef.h>
-#include <stdint.h>
 
-typedef struct GlbFile GlbFile;
+typedef struct GltfDoc GltfDoc;
 
-GlbFile *GlbFile_Load(const char *path, ErrorCode *error);
-void GlbFile_Destroy(GlbFile *self);
-const char *GlbFile_JsonText(GlbFile *self);
-const uint8_t *GlbFile_BinaryChunk(GlbFile *self);
-size_t GlbFile_BinaryLength(GlbFile *self);
+GltfDoc *GltfDoc_Load(const char *path, ErrorCode *error);
+void GltfDoc_Destroy(GltfDoc *self);
+size_t GltfDoc_NodeCount(GltfDoc *self);
+const char *GltfDoc_NodeName(GltfDoc *self, size_t node_index);
+size_t GltfDoc_AnimationCount(GltfDoc *self);
 ```
 
 Conventions this illustrates:
@@ -133,12 +136,15 @@ Conventions this illustrates:
 - Constructors return a heap pointer (or `NULL` on failure) and take an
   `ErrorCode *` out-parameter for failure detail.
 - Every constructor has a matching destructor. See memory rules below.
-- Accessors are named for what they return (`JsonText`, `BinaryLength`).
+- Accessors are named for what they return (`NodeName`, `AnimationCount`).
 
-**Exception — small value types.** `Vec3`, `Quat`, `Mat4` and `Transform`
-(translation/rotation/scale) are plain structs passed **by value** with
-pure functions (`Quat_Multiply(a, b)`, `Vec3_Cross(a, b)`). Opaque pointers
-would make the math unreadable. They never allocate.
+**Exception — math types.** Vectors, quaternions and matrices are cglm's
+array types (`vec3`, `versor`, `mat4`), passed as pointers with a trailing
+`dest` out-parameter in cglm's own style. The tool's `Transform` (a plain
+struct holding `vec3 translation; versor rotation; vec3 scale;`) follows
+the same convention: `Transform_Compose(const Transform *parent, const
+Transform *child, Transform *dest)`. These never allocate and are not
+opaque; opaque pointers would make the math unreadable.
 
 ## Memory management
 
@@ -164,6 +170,9 @@ would make the math unreadable. They never allocate.
   in constructors/parsers. Define the codes centrally (`error_code.h`).
 - Report user-facing errors to `stderr` with `fprintf`; keep `stdout` for
   actual program output (`info` listing, conversion summary).
+- Library failures are translated at the boundary: a `cgltf_result` other
+  than success becomes `ERR_OPEN_INPUT` or `ERR_BAD_GLB` with the result
+  name in the message; a `NULL` from json-c is `ERR_INTERNAL`.
 - Fail loudly and early on malformed input — a bad GLB should produce a
   clear diagnostic (what was expected, where), not a crash or silent wrong
   output. Unsupported-but-valid input (external `.bin` buffers, data URIs,
@@ -186,7 +195,11 @@ would make the math unreadable. They never allocate.
 │   ├── acceptance/       # whole-app tests driving App_Run on fixtures
 │   └── data/             # fixture GLBs (see glb-subset.md)
 ├── scripts/
-│   └── init.sh           # fetch Cest header + runner into external/
+│   └── init.sh           # init submodules; fetch Cest header + runner
+├── third_party/          # git submodules, pinned tags (see libraries.md)
+│   ├── cgltf/
+│   ├── cglm/
+│   └── json-c/
 ├── external/             # created by init.sh; git-ignored
 │   └── cest/
 └── docs/                 # this documentation set
@@ -194,6 +207,8 @@ would make the math unreadable. They never allocate.
 
 - `external/` is **git-ignored** and populated by `init.sh`. Never vendor
   the downloaded files into the repo.
+- `third_party/` is **read-only**: never edit a submodule's files; upgrade
+  by checking out a newer tag and committing the pointer.
 - The tool's own headers go in `inc/` and are included as `<name.h>` with
   `inc/` on the `-I` path.
 - Fixtures live in `test/data/` (not `tests/fixtures/`); CMake passes the
@@ -201,17 +216,19 @@ would make the math unreadable. They never allocate.
 
 ## The script: `scripts/init.sh`
 
-Gets the test dependencies ready so the user needs nothing pre-installed
-beyond a C/C++ toolchain, CMake, curl and git.
+Gets the vendored libraries and the test dependencies ready so the user
+needs nothing pre-installed beyond a C/C++ toolchain, CMake, curl and git.
 
 Responsibilities:
-1. Create `external/cest/` if absent.
-2. Fetch **Cest v5** from the release
+1. `git submodule update --init` so `third_party/{cgltf,cglm,json-c}` are
+   populated at their pinned tags; fail clearly if the checkout is empty.
+2. Create `external/cest/` if absent.
+3. Fetch **Cest v5** from the release
    https://github.com/cegonse/cest/releases/tag/v5 : the header asset
    (named `cest`) and the platform-matching `cest-runner` binary (select by
    `uname -s`/`uname -m`; sha256-verified; mark executable; smoke-test with
    `--help`). See `testing-guidelines.md` for the asset table.
-3. Verify the artifacts exist afterward and report their paths; exit
+4. Verify the artifacts exist afterward and report their paths; exit
    non-zero with a clear message if anything is missing.
 
 Guidelines:
@@ -228,5 +245,9 @@ Guidelines:
 - Don't "fix" the destination model's coordinate conventions (see
   `glb-subset.md` — the fixture is deliberately not Y-up). The output must
   reproduce the destination armature verbatim.
+- Don't hand-parse JSON or GLB input (cgltf does it), don't write your
+  own quaternion math (cglm does it), don't hand-format JSON output
+  (json-c does it). The one in-house format job is the 12-byte GLB
+  header plus two chunks on write.
 - Don't optimize the retargeter for speed at the cost of clarity.
 - Don't add heap allocation without a destructor and a test.

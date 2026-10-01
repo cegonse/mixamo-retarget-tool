@@ -3,7 +3,8 @@
 The core of the tool: how a source animation on skeleton **S** becomes an
 animation on destination skeleton **D** when bone names, rest poses,
 world orientation and scale all differ. Read `glb-subset.md` first for
-the data model and the fixture facts.
+the data model and the fixture facts, and `libraries.md` for which cglm
+call implements each operation below.
 
 ## 0. Notation
 
@@ -56,8 +57,9 @@ is evaluated on a **uniform grid** and re-keyed:
   `t_i = t_start + i / fps`, written out as `i / fps` (grid starts at 0).
 - Per channel evaluation at time `t` (clamped to `[first, last]` key):
   - `STEP`: value of the last key `≤ t`.
-  - `LINEAR`: translation/scale lerp; rotation **slerp along the shortest
-    path** (negate `b` if `dot(a, b) < 0`) and normalise.
+  - `LINEAR`: translation/scale lerp (`glm_vec3_lerp`); rotation **slerp
+    along the shortest path** (`glm_quat_slerp`; verify in a test that it
+    flips sign on negative dot, else negate `b` first) and normalise.
   - `CUBICSPLINE`: per spec, with `τ = (t − t_k) / (t_{k+1} − t_k)`,
     `p = (2τ³ − 3τ² + 1)·v_k + (τ³ − 2τ² + τ)·Δt·b_k + (−2τ³ + 3τ²)·v_{k+1} + (τ³ − τ²)·Δt·a_{k+1}`
     where `a` are in-tangents and `b` out-tangents; rotations are
@@ -81,7 +83,7 @@ translation — that maps source world space onto destination world space:
   cross-covariance, form Horn's symmetric 4×4 `N` matrix, take the
   eigenvector of its largest eigenvalue as `Q` (a **Jacobi eigenvalue
   iteration** on a 4×4 symmetric matrix is ~50 lines and all that is
-  needed), then `k = Σ (Q·p̃_s)·p̃_d / Σ ‖p̃_s‖²` (ratio of the rotated
+  needed; cglm has no eigen solver, so this is in-house, in `double`), then `k = Σ (Q·p̃_s)·p̃_d / Σ ‖p̃_s‖²` (ratio of the rotated
   source spread onto the destination spread; always positive), and `c`
   from the centroids. `Q` is proper (det +1) by construction.
 - Need ≥ 3 non-collinear pairs; otherwise `Q = I`, `k = 1` and a warning.
@@ -111,8 +113,9 @@ direction** in destination world space:
 where `child(s)` is the *mapped child* of `s` (the mapped descendant whose
 destination is a child of `d` in the mapped-only hierarchy). Then:
 
-- If `s` has **exactly one** mapped child: `A_s = Quat_FromTo(dir_s, dir_d)`,
-  the minimal-arc rotation taking the source direction onto the destination
+- If `s` has **exactly one** mapped child: `A_s = MinimalArc(dir_s, dir_d)`
+  (`glm_quat_from_vecs`, wrapped for the anti-parallel case), the
+  minimal-arc rotation taking the source direction onto the destination
   direction.
 - Otherwise (a leaf such as a hand, head or toe, or a fork such as hips or
   the upper spine): `A_s = A_parent`, inherited from the nearest mapped
@@ -172,8 +175,8 @@ Walk destination joints parents-first:
   the identity `Armature` node); others: `pos(L^a_d) = t_d`.
 - scale: `s_d`.
 
-Rotation keys are **sign-continuous**: if `dot(q_i, q_{i−1}) < 0` negate
-`q_i` so LINEAR interpolation in the engine never takes the long way round.
+Rotation keys are **sign-continuous**: if `glm_quat_dot(q_i, q_{i−1}) < 0`
+negate `q_i` so LINEAR interpolation in the engine never takes the long way round.
 Keys are written as `float32`.
 
 ## 8. Diagnostics printed by `convert`
@@ -198,4 +201,4 @@ code for malformed output, never a silently written file).
    → with rest alignment the result equals step 2 within ε on the arm
    joints. Proves §4.
 5. **Real library**: the UAL export → in-engine check next to
-   `sword_run.glb` (manual, `PLAN.md` phase 11).
+   `sword_run.glb` (manual, `PLAN.md` phase 9).

@@ -56,13 +56,14 @@ The developer's current machine (Linux x86_64) resolves to
   ```cpp
   #include <cest>
   extern "C" {
-  #include <vec_math.h>   // C module under test, via <...>
+  #include <transform.h>   // C module under test, via <...>
   }
 
-  describe("Quat", []() {
-      it("multiplies by identity", []() {
-          Quat q = Quat_Multiply(Quat_Identity(), rotation);
-          expect(q.w).toBe(rotation.w, 1e-6f);
+  describe("Transform", []() {
+      it("composes with identity", []() {
+          Transform result;
+          Transform_Compose(&identity, &child, &result);
+          expect(result.rotation[3]).toBe(child.rotation[3], 1e-6f);
       });
   });
   ```
@@ -84,7 +85,7 @@ The developer's current machine (Linux x86_64) resolves to
 ## File naming and layout
 
 - One unit-test file per module, named **`module-name.test.cpp`** (matching
-  the module: `json.test.cpp`, `glb-file.test.cpp`, `vec-math.test.cpp`,
+  the module: `transform.test.cpp`, `gltf-doc.test.cpp`,
   `frame-align.test.cpp`, ...).
 - Acceptance tests in their own `*.test.cpp` file(s) under
   `test/acceptance/`, using the fixture GLBs.
@@ -92,10 +93,8 @@ The developer's current machine (Linux x86_64) resolves to
   ```
   test/
   ├── unit/
-  │   ├── vec-math.test.cpp
-  │   ├── json.test.cpp
-  │   ├── json-writer.test.cpp
-  │   ├── glb-file.test.cpp
+  │   ├── app.test.cpp
+  │   ├── transform.test.cpp
   │   ├── gltf-doc.test.cpp
   │   ├── skeleton.test.cpp
   │   ├── anim-track.test.cpp
@@ -148,15 +147,17 @@ foreach(TEST_FILE ${TEST_FILES})
   set(EXEC_NAME test_${FILE_NAME})
   add_executable(${EXEC_NAME} EXCLUDE_FROM_ALL ${TEST_FILE} ${TOOL_LIB_SOURCES})
   target_include_directories(${EXEC_NAME} PRIVATE
-    ${CMAKE_SOURCE_DIR}/inc          # tool headers, included as <name.h>
-    ${CEST_DIR})                     # the 'cest' header
+    ${CMAKE_SOURCE_DIR}/inc                      # tool headers, included as <name.h>
+    ${CMAKE_SOURCE_DIR}/third_party/cgltf        # <cgltf.h>
+    ${CMAKE_SOURCE_DIR}/third_party/cglm/include # <cglm/cglm.h>
+    ${CEST_DIR})                                 # the 'cest' header
   target_compile_options(${EXEC_NAME} PRIVATE
     -g -O0 -Wall -Wunused-value -Werror
     $<$<COMPILE_LANGUAGE:CXX>:-std=c++20>
     $<$<COMPILE_LANGUAGE:C>:-std=c99>
     ${SAN_COMPILE})
   target_link_options(${EXEC_NAME} PRIVATE ${SAN_LINK})
-  target_link_libraries(${EXEC_NAME} PRIVATE m)
+  target_link_libraries(${EXEC_NAME} PRIVATE json-c m)   # json-c: add_subdirectory target
   target_compile_definitions(${EXEC_NAME} PRIVATE
     FIXTURES_DIR="${CMAKE_SOURCE_DIR}/test/data")
   add_test(NAME ${EXEC_NAME} COMMAND ${EXEC_NAME})
@@ -178,9 +179,14 @@ Notes:
   #include <cest>
   extern "C" {
   #include <app_main.h>
-  #include <glb_file.h>
+  #include <gltf_doc.h>
   }
   ```
+- The `json-c` target comes from `add_subdirectory(third_party/json-c)`
+  in the top-level CMakeLists (see `libraries.md` for the cache options to
+  set first); cgltf and cglm are header-only includes. The cgltf
+  implementation is compiled once inside `src/gltf_doc.c`, so test files
+  must **not** define `CGLTF_IMPLEMENTATION`.
 - Tests that write files use a per-test temporary path under the build
   tree (`FIXTURES_DIR` is read-only input; never write into `test/data/`).
 
@@ -230,27 +236,22 @@ capture into a `tmpfile()` and assert on the text.
 Test each module's public surface in isolation. The expected coverage per
 module (see `PLAN.md` for the phase each belongs to):
 
-- **vec_math**: quaternion multiply/inverse/normalize against hand-computed
-  values; slerp endpoints and midpoint; `Quat_FromAxisAngle`; minimal-arc
-  `Quat_FromTo(a, b)` rotates `a` onto `b` (including the anti-parallel
-  case); `Mat4_Decompose` of a composed TRS recovers T/R/S; rigid inverse.
-- **json**: objects, arrays, nested values, strings with escapes
-  (`\"`, `\\`, `\n`, `é`), numbers (negative, exponent, fraction),
-  `true/false/null`; malformed input returns an error and leaks nothing;
-  member lookup on a missing key returns `NULL`.
-- **json_writer**: produces canonical, compact JSON (no trailing commas,
-  escaped strings, floats printed with `%.9g` and never `nan`/`inf`).
-- **glb_file**: parses the 12-byte header and the two chunks of each
-  fixture (magic, version 2, lengths; BIN length matches
-  `buffers[0].byteLength`); rejects bad magic, truncated header, truncated
-  chunk; `GlbFile_Write` round-trips (write → load → byte-equal JSON and
-  BIN, 4-byte padding honoured).
-- **gltf_doc**: node count/names/children/TRS from `test_player.glb`
-  (25 joints under `mixamorig:Hips`, root `Armature` at node 26); skin
-  joints order and 25 inverse bind matrices; animation channels/samplers
-  with input/output accessor data decoded (float and normalized-int
-  component types); `matrix` nodes decomposed; unsupported features
-  (external buffer URI, sparse accessor) rejected with an error.
+- **transform** (thin layer over cglm): compose/inverse round-trip on a
+  known TRS; `Transform_FromNode` for TRS nodes and for `matrix` nodes
+  (decompose recovers T/R/S; a sheared matrix is rejected);
+  `Transform_MinimalArc(a, b)` rotates `a` onto `b` for perpendicular,
+  near-parallel and **anti-parallel** inputs (this pins down whether
+  `glm_quat_from_vecs` needs a wrapper); `Transform_EulerDegrees` of a
+  90° X rotation reads (90, 0, 0); shortest-path slerp midpoint between
+  equivalent rotations of opposite sign stays near the endpoints.
+- **gltf_doc** (wrapper over cgltf): loads each fixture; node
+  count/names/children/TRS from `test_player.glb` (25 joints under
+  `mixamorig:Hips`, root `Armature` at node 26); skin joints order and 25
+  inverse bind matrices read through the accessor helpers; animation
+  channels/samplers with decoded input/output floats (`sword_run`: 21
+  keys 0.0333→0.7); a missing file → `ERR_OPEN_INPUT`; a truncated or
+  garbage GLB → `ERR_BAD_GLB` naming the `cgltf_result`; destroy frees
+  everything (ASan).
 - **skeleton**: hierarchy order (parents before children), parent indices,
   global rest transforms (Hips global == local since `Armature` is
   identity; `Spine` global translation == Hips·Spine), name lookup.
@@ -270,10 +271,13 @@ module (see `PLAN.md` for the phase each belongs to):
   destination's direction; unmapped destination joints keep rest; root
   translation scales by `k` and rotates by `Q`; `--in-place` zeroes the
   horizontal displacement.
-- **glb_writer**: emitted document has nodes/skin/animation/accessors/
-  bufferViews/buffers in the documented shape; every animation input
-  accessor carries `min`/`max`; byte offsets are 4-byte aligned; no
-  `mesh`/`material` keys.
+- **glb_writer** (json-c + in-house framing): emitted document has
+  nodes/skin/animation/accessors/bufferViews/buffers in the documented
+  shape; every animation input accessor carries `min`/`max`; byte offsets
+  are 4-byte aligned; JSON chunk padded with spaces, BIN with zeros; no
+  `mesh`/`material` keys; floats serialised with `%.9g` (a value like
+  `0.1f` round-trips exactly); the produced bytes parse back through
+  `gltf_doc` (cgltf) and pass `cgltf_validate`.
 - **args**: both commands, every flag, missing/duplicate/invalid values →
   `ERR_BAD_ARGS` with a usage message.
 
@@ -353,14 +357,15 @@ Seam guidelines:
   signal as a failure.
 
 ## CI order
-`scripts/init.sh` (fetch Cest) -> build tool -> build tests -> `cest-runner
+`scripts/init.sh` (init submodules, fetch Cest) -> build tool -> build tests -> `cest-runner
 build/` (unit + acceptance, ASan on).
 
 ## What good coverage looks like here
 - Every module: constructor/destructor, happy path, one malformed/edge case.
-- JSON + GLB: fixture round-trips byte-exact; malformed input rejected.
-- Math: known-answer quaternion/matrix cases; Horn solve recovers a known
-  similarity transform.
+- GLB: fixtures load through cgltf; produced files parse back and
+  validate; malformed input rejected.
+- Math: transform helpers over cglm have known-answer cases; Horn solve
+  recovers a known similarity transform.
 - Retarget: identity is identity; frame change is undone; A→T correction
   verified on bone directions.
 - Acceptance: `info` on both fixtures; identity and frame-change converts
