@@ -1,6 +1,7 @@
 #include <cest>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <string>
 #include <vector>
 extern "C" {
@@ -88,9 +89,7 @@ describe("convert command", []() {
     GltfDoc_Destroy(produced);
     GltfDoc_Destroy(reference);
     produced = reference = nullptr;
-    remove((output_dir + "/identity.glb").c_str());
-    remove((output_dir + "/sword_run.glb").c_str());
-    remove((output_dir + "/mixamo.com.glb").c_str());
+    std::filesystem::remove_all(output_dir);
   });
 
   it("maps test_player onto itself unchanged", []() {
