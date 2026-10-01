@@ -24,6 +24,13 @@ typedef struct GltfChannel {
   size_t sampler;
 } GltfChannel;
 
+typedef struct GltfNodeTrs {
+  int has_translation;
+  int has_rotation;
+  int has_scale;
+  Transform transform;
+} GltfNodeTrs;
+
 #define GLTF_NO_NODE ((size_t)-1)
 
 GltfDoc *GltfDoc_Load(const char *path, ErrorCode *error);
@@ -39,6 +46,7 @@ size_t GltfDoc_NodeChild(GltfDoc *self, size_t node, size_t child);
 int GltfDoc_NodeHasMesh(GltfDoc *self, size_t node);
 int GltfDoc_NodeHasSkin(GltfDoc *self, size_t node);
 ErrorCode GltfDoc_NodeRest(GltfDoc *self, size_t node, Transform *dest);
+ErrorCode GltfDoc_NodeTrs(GltfDoc *self, size_t node, GltfNodeTrs *dest);
 void GltfDoc_NodeRestWorldMatrix(GltfDoc *self, size_t node, mat4 dest);
 
 size_t GltfDoc_SkinCount(GltfDoc *self);

@@ -132,6 +132,14 @@ ErrorCode GltfDoc_NodeRest(GltfDoc *self, size_t node, Transform *dest) {
   return error;
 }
 
+ErrorCode GltfDoc_NodeTrs(GltfDoc *self, size_t node, GltfNodeTrs *dest) {
+  cgltf_node *source = nodeAt(self, node);
+  dest->has_translation = source->has_translation || source->has_matrix;
+  dest->has_rotation = source->has_rotation || source->has_matrix;
+  dest->has_scale = source->has_scale || source->has_matrix;
+  return GltfDoc_NodeRest(self, node, &dest->transform);
+}
+
 void GltfDoc_NodeRestWorldMatrix(GltfDoc *self, size_t node, mat4 dest) {
   cgltf_node_transform_world(nodeAt(self, node), (float *)dest);
 }

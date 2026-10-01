@@ -79,7 +79,8 @@ The developer's current machine (Linux x86_64) resolves to
   shared objects must also reset the pointers to `nullptr`, or the next
   test's `afterEach` double-frees. An ASan abort inside a test binary is
   likewise reported only as a silent exit 1; bisect with
-  `build/test_<name> -g "<case>"`.
+  `build/test_<name> -g "<case>"`, then read the report with
+  `ASAN_OPTIONS=log_path=/tmp/asan build/test_<name> -g "<case>"`.
 - **Focus/skip** - `fit`/`xit`, `fdescribe`/`xdescribe`, `todo(...)`.
 - **Parametrized** - `withParameter<T>().withValue(...).thenDo([](T x){...})`
   for table-driven cases.
@@ -307,8 +308,13 @@ app is linked and run against the fixture GLBs, verifying input -> output.
 - **convert, sword_run → test_player**: identity map, default options; the
   output's local rotations match `sword_run.glb` within a loose tolerance
   (the two fixtures' rest poses differ by a couple of degrees at the
-  shoulders), hips translation keys match within 1 unit, 21 keys, duration
-  0.7 s, scale channels present.
+  shoulders; measured worst case 2.2° on `RightForeArm`, test bound 3°),
+  the hips **displacement from each file's own rest** matches within 1
+  unit (absolute keys cannot: §6 anchors the hips at the destination's
+  rest, which sits ~12 units from `sword_run`'s), 21 keys, grid
+  0 → 0.667 s (`sword_run` itself runs 0.033 → 0.7 s), scale channels
+  present. Some `sword_run` channels hold only 2 keys (Blender collapses
+  constant channels); compare only channels with matching key counts.
 - **convert, synthetic frame change**: the test builds a transformed copy
   of `sword_run.glb` in memory (armature rotated 90° about X and scaled
   ×0.01, animation transformed accordingly), writes it to a temp GLB, then

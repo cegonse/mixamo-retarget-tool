@@ -103,6 +103,11 @@ which is known to load in the engine:
   shared 2-key input accessor (first and last time) for the scale
   channels. Output accessors: `VEC3`/`VEC4` float, one bufferView each
   (or one view per channel kind; either is fine, offsets 4-byte aligned).
+  As implemented (phase 7): accessor 0 is the N-key time grid, 1 the
+  scale time pair (a single key when N = 1), then per skin joint in skin
+  order the T, R and S outputs, and last the copied MAT4 IBMs; one
+  bufferView per accessor. Channels and samplers are in the same order
+  (sampler i ↔ channel i), T/R/S per joint, like `sword_run.glb`.
 - **Every animation input accessor carries `min` and `max`** (required by
   the spec). Output accessors need none.
 - Time grid starts at `0` and advances by `1/fps` (see `retargeting.md`

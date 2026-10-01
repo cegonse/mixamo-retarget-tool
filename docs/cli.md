@@ -56,7 +56,7 @@ Arguments:
 | `--map` | `srcBone=dstBone` pairs, comma-separated; names may contain `:` (Mixamo) and are matched exactly |
 | `--map-file` | same pairs, one per line; `#` starts a comment; blank lines ignored |
 | `--out-dir` | directory for `<track>.glb` outputs (created if missing); required unless `--out` |
-| `--out` | explicit output file; only valid when exactly one track is converted |
+| `--out` | explicit output file; only valid when exactly one track is converted; its parent directory is created if missing |
 | `--fps` | resampling rate; default inferred from the source track (`retargeting.md` §2) |
 | `--in-place` | strip horizontal root displacement (`retargeting.md` §6) |
 | `--src-up` | source up axis used by `--in-place`; default `Y` |

@@ -1,7 +1,8 @@
 #include <app_main.h>
+#include <args.h>
+#include <convert_command.h>
 #include <error_code.h>
 #include <info_command.h>
-#include <string.h>
 
 static FILE *output_stream = NULL;
 
@@ -20,36 +21,23 @@ static FILE *currentOutput(void) {
   return output_stream != NULL ? output_stream : stdout;
 }
 
-static int isHelpFlag(const char *argument) {
-  return strcmp(argument, "--help") == 0 || strcmp(argument, "-h") == 0;
-}
-
 void App_SetOutputStream(FILE *stream) {
   output_stream = stream;
 }
 
-static int usageError(void) {
-  fputs(usage_text, stderr);
-  return ERR_BAD_ARGS;
-}
-
-static int runInfo(int argc, char **argv) {
-  int show_rest = 0;
-  if (argc == 4 && strcmp(argv[3], "--rest") == 0) {
-    show_rest = 1;
-  } else if (argc != 3) {
-    return usageError();
-  }
-  return InfoCommand_Run(currentOutput(), argv[2], show_rest);
-}
-
 int App_Run(int argc, char **argv) {
-  if (argc >= 2 && isHelpFlag(argv[1])) {
+  Args args;
+  ErrorCode error = Args_Parse(argc, argv, &args);
+  if (error != ERR_NONE) {
+    fputs(usage_text, stderr);
+    return error;
+  }
+  if (args.command == COMMAND_HELP) {
     fputs(usage_text, currentOutput());
     return ERR_NONE;
   }
-  if (argc >= 2 && strcmp(argv[1], "info") == 0) {
-    return runInfo(argc, argv);
+  if (args.command == COMMAND_INFO) {
+    return InfoCommand_Run(currentOutput(), args.source_path, args.show_rest);
   }
-  return usageError();
+  return ConvertCommand_Run(currentOutput(), &args);
 }

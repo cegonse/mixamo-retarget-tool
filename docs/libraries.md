@@ -115,10 +115,15 @@ Calls used (`glb_writer`):
   `snprintf("%.9g")` — guarantees float32 round-trip, locale-independent
   output and no `nan`/`inf` (assert finite before formatting).
   Alternatively `json_c_set_serialization_double_format("%.9g",
-  JSON_C_OPTION_GLOBAL)` once at startup; pick one in phase 7 and test it.
+  JSON_C_OPTION_GLOBAL)` once at startup. **Chosen (phase 7):**
+  `json_object_new_double_s` via `JsonFloat_New`, which returns `NULL` for
+  a non-finite value so the writer fails with `ERR_INTERNAL`
+  (`json-float.test.cpp` pins `0.1f` → `0.100000001`).
 - Serialise: `json_object_to_json_string_length(root,
-  JSON_C_TO_STRING_PLAIN, &length)` (compact, no spaces); the returned
-  buffer is owned by `root`.
+  JSON_C_TO_STRING_PLAIN | JSON_C_TO_STRING_NOSLASHESCAPE, &length)`
+  (compact, no spaces; json-c escapes `/` as `\/` unless told not to,
+  and track names may contain `/`); the returned buffer is owned by
+  `root`.
 - Free: a single `json_object_put(root)` releases the tree (ownership of
   children transfers on `_add`; never `put` a child after adding it).
 
