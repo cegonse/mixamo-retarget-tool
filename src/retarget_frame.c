@@ -14,16 +14,16 @@ static void parentGlobal(Retarget *self, Pose *destination_pose, size_t joint, T
 static void globalRotation(Retarget *self, Pose *source_pose, size_t pair, versor dest) {
   size_t source_joint = BoneMap_SourceJoint(self->map, pair);
   size_t destination_joint = BoneMap_DestinationJoint(self->map, pair);
-  versor rest_inverse, delta, frame_inverse, correction_inverse;
+  versor rest_inverse, delta, half_aligned, aligned, frame_inverse, correction_inverse, corrected;
   glm_quat_inv((float *)Skeleton_RestGlobal(self->source, source_joint)->rotation, rest_inverse);
   glm_quat_mul(Pose_Global(source_pose, source_joint)->rotation, rest_inverse, delta);
   glm_quat_inv(self->alignment.rotation, frame_inverse);
-  glm_quat_mul(self->alignment.rotation, delta, delta);
-  glm_quat_mul(delta, frame_inverse, delta);
+  glm_quat_mul(self->alignment.rotation, delta, half_aligned);
+  glm_quat_mul(half_aligned, frame_inverse, aligned);
   glm_quat_inv(self->corrections[pair], correction_inverse);
-  glm_quat_mul(delta, correction_inverse, dest);
-  glm_quat_mul(dest, (float *)Skeleton_RestGlobal(self->destination, destination_joint)->rotation,
-    dest);
+  glm_quat_mul(aligned, correction_inverse, corrected);
+  glm_quat_mul(corrected,
+    (float *)Skeleton_RestGlobal(self->destination, destination_joint)->rotation, dest);
   glm_quat_normalize(dest);
 }
 

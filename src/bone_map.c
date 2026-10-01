@@ -153,6 +153,24 @@ static ErrorCode addLine(BoneMap *self, const char *line) {
   return addEntry(self, line, end);
 }
 
+ErrorCode BoneMap_AddText(BoneMap *self, const char *text) {
+  char line[MAX_LINE_LENGTH];
+  const char *start = text;
+  ErrorCode error = ERR_NONE;
+  while (error == ERR_NONE && *start != '\0') {
+    const char *end = strchr(start, '\n');
+    size_t length = end != NULL ? (size_t)(end - start) : strlen(start);
+    if (length >= sizeof line) {
+      return BoneMap_Fail(self, ERR_BAD_ARGS, "map line too long: %.40s", start);
+    }
+    memcpy(line, start, length);
+    line[length] = '\0';
+    error = addLine(self, line);
+    start = end != NULL ? end + 1 : start + length;
+  }
+  return error;
+}
+
 ErrorCode BoneMap_AddFile(BoneMap *self, const char *path) {
   char line[MAX_LINE_LENGTH];
   ErrorCode error = ERR_NONE;

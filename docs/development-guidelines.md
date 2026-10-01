@@ -34,7 +34,9 @@ the tool focused; resist pulling asset-pipeline concerns into it.
 - **Third-party code: the three vendored libraries only** — cgltf (read
   glTF), cglm (math), json-c (write JSON) — as git submodules under
   `third_party/`, plus system-wide packaged libraries (zlib, cairo, …)
-  when a real need appears. Every library is recorded in `libraries.md`
+  when a real need appears. The browser tool additionally links raylib's
+  prebuilt WebAssembly release (`external/raylib`, fetched by
+  `scripts/init-web.sh`) and is compiled with the Emscripten SDK. Every library is recorded in `libraries.md`
   with its role; don't add one silently and don't reimplement what they
   already do.
 - **CMake** for the build (`cmake_minimum_required(VERSION 3.22)`).
@@ -98,6 +100,14 @@ the tool focused; resist pulling asset-pipeline concerns into it.
   `#include "foo.h"`. Configure the build with `-I` include paths
   (`target_include_directories`) so headers resolve globally. This applies
   to the project's own headers too.
+- **Never alias a cglm `dest` with one of its inputs** (`glm_quat_mul(q,
+  r, q)`, `glm_quat_rotate(m, q, m)`, …): use a named temporary. cglm's
+  SSE paths load every input before writing, which hides the bug on
+  x86, but its scalar fallbacks — the code WebAssembly runs — write
+  `dest` component by component and read the clobbered input. Found in
+  phase 11; `test/unit/scalar-math.test.cpp` is compiled with the SSE
+  macros undefined to keep the scalar paths covered natively.
+  Element-wise vector ops (`glm_vec3_add/scale/mul`) are safe either way.
 - **Floating point is `float`** for everything stored (glTF stores
   `float32`) and for all cglm calls; the in-house Procrustes/Jacobi solve
   may widen to `double` internally, with explicit conversions at its edge.
@@ -194,14 +204,20 @@ opaque; opaque pointers would make the math unreadable.
 │   ├── unit/             # Cest unit tests, one per module
 │   ├── acceptance/       # whole-app tests driving App_Run on fixtures
 │   └── data/             # fixture GLBs (see glb-subset.md)
+├── web-tool/             # browser front end (docs/web-tool.md)
+│   ├── CMakeLists.txt    # emcmake project
+│   ├── inc/ src/         # web_session (tested natively), web_api, web_viewer
+│   └── www/              # index.html, app.js, style.css
 ├── scripts/
-│   └── init.sh           # init submodules; fetch Cest header + runner
+│   ├── init.sh           # init submodules; fetch Cest header + runner
+│   └── init-web.sh       # fetch raylib 6.0 WebAssembly release
 ├── third_party/          # git submodules, pinned tags (see libraries.md)
 │   ├── cgltf/
 │   ├── cglm/
 │   └── json-c/
-├── external/             # created by init.sh; git-ignored
-│   └── cest/
+├── external/             # created by init.sh / init-web.sh; git-ignored
+│   ├── cest/
+│   └── raylib/
 └── docs/                 # this documentation set
 ```
 

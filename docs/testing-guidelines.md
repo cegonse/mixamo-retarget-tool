@@ -298,6 +298,19 @@ module (see `PLAN.md` for the phase each belongs to):
 **create/destroy pair**, run under ASan so leaks surface. Destructors must
 accept `NULL`.
 
+**Scalar math.** `scalar-math.test.cpp` is the one test target compiled
+with `-U__SSE__ -U__SSE2__ …` (see `SCALAR_MATH_FLAGS` in
+`CMakeLists.txt`): cglm then takes its plain-C paths, exactly what the
+WebAssembly build executes, and the retarget invariants (`A_TPose` →
+destination rest) must still hold. It exists because cglm's scalar
+functions are not safe when `dest` aliases an input while the SSE ones
+are, so an aliased call passes every other test and fails only in the
+browser.
+
+**Web session.** `web-session.test.cpp` covers `web-tool/src/web_session.c`
+(incremental loads, map text, options, clip and GLB bytes, file names);
+the root CMake compiles that file into every test executable.
+
 ## Acceptance tests (whole-app, always green)
 
 Keep a **working set of acceptance-level tests** at all times: the entire

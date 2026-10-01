@@ -16,6 +16,8 @@ set_target_properties(json-c PROPERTIES
   $<TARGET_PROPERTY:json-c,INTERFACE_INCLUDE_DIRECTORIES>)
 
 set(TOOL_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/inc)
+set(WEB_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/web-tool/inc)
+set(WEB_LIB_SOURCES ${CMAKE_SOURCE_DIR}/web-tool/src/web_session.c)
 set(THIRD_PARTY_INCLUDE_DIRS
   ${CMAKE_SOURCE_DIR}/third_party/cgltf
   ${CMAKE_SOURCE_DIR}/third_party/cglm/include)
@@ -42,6 +44,9 @@ endif()
 
 file(GLOB_RECURSE TEST_FILES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/test/*.test.cpp)
 
+set(SCALAR_MATH_FLAGS -U__SSE__ -U__SSE2__ -U__SSE3__ -U__SSSE3__ -U__SSE4_1__ -U__SSE4_2__
+  -U__AVX__ -U__AVX2__ -U__FMA__ -U__MMX__)
+
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test-output)
 
 add_custom_target(build_tests)
@@ -49,14 +54,17 @@ add_custom_target(build_tests)
 foreach(TEST_FILE ${TEST_FILES})
   get_filename_component(FILE_NAME ${TEST_FILE} NAME_WE)
   set(EXEC_NAME test_${FILE_NAME})
-  add_executable(${EXEC_NAME} EXCLUDE_FROM_ALL ${TEST_FILE} ${TOOL_LIB_SOURCES})
-  target_include_directories(${EXEC_NAME} PRIVATE ${TOOL_INCLUDE_DIRS} ${CEST_DIR})
+  add_executable(${EXEC_NAME} EXCLUDE_FROM_ALL ${TEST_FILE} ${TOOL_LIB_SOURCES} ${WEB_LIB_SOURCES})
+  target_include_directories(${EXEC_NAME} PRIVATE ${TOOL_INCLUDE_DIRS} ${WEB_INCLUDE_DIRS} ${CEST_DIR})
   target_include_directories(${EXEC_NAME} SYSTEM PRIVATE ${THIRD_PARTY_INCLUDE_DIRS})
   target_compile_options(${EXEC_NAME} PRIVATE
     -g -O0 -Wall -Wunused-value -Werror
     $<$<COMPILE_LANGUAGE:CXX>:-std=c++20>
     $<$<COMPILE_LANGUAGE:C>:-std=c99>
     ${SAN_COMPILE})
+  if(FILE_NAME STREQUAL "scalar-math")
+    target_compile_options(${EXEC_NAME} PRIVATE ${SCALAR_MATH_FLAGS})
+  endif()
   target_link_options(${EXEC_NAME} PRIVATE ${SAN_LINK})
   target_link_libraries(${EXEC_NAME} PRIVATE json-c m)
   target_compile_definitions(${EXEC_NAME} PRIVATE

@@ -1,4 +1,3 @@
-#include <anim_track.h>
 #include <animation_clip.h>
 #include <convert_command.h>
 #include <convert_report.h>
@@ -8,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <track_convert.h>
 #include <track_selection.h>
 
 static int isSafeCharacter(char character) {
@@ -33,50 +33,11 @@ char *ConvertCommand_OutputPath(const char *out_dir, const char *track_name) {
   return path;
 }
 
-static ErrorCode sampleClip(ConvertSession *session, const AnimTrack *track, AnimationClip *clip,
-    Pose *source_pose, Pose *destination_pose) {
-  size_t frame;
-  ErrorCode error = ERR_NONE;
-  Retarget_BeginTrack(session->retarget);
-  for (frame = 0; frame < AnimationClip_FrameCount(clip) && error == ERR_NONE; frame++) {
-    float time = AnimTrack_Start(track) + (float)frame / AnimationClip_Fps(clip);
-    AnimTrack_EvaluatePose(track, time, source_pose);
-    error = Retarget_Frame(session->retarget, source_pose, destination_pose);
-    AnimationClip_SetFrame(clip, frame, destination_pose);
-  }
-  return error;
-}
-
-static AnimationClip *retargetTrack(ConvertSession *session, const Args *args, size_t animation,
-    ErrorCode *error) {
-  AnimTrack *track = AnimTrack_FromDoc(session->source_doc, animation, session->source, error);
-  Pose *source_pose = Pose_Create(Skeleton_JointCount(session->source));
-  Pose *destination_pose = Pose_Create(Skeleton_JointCount(session->destination));
-  AnimationClip *clip = NULL;
-  if (track != NULL && source_pose != NULL && destination_pose != NULL) {
-    float fps = args->has_fps ? args->fps : AnimTrack_Fps(track);
-    clip = AnimationClip_Create(AnimTrack_Name(track), Skeleton_JointCount(session->destination),
-      AnimTrack_FrameCount(track, fps), fps);
-    *error = clip != NULL ? sampleClip(session, track, clip, source_pose, destination_pose)
-      : ERR_INTERNAL;
-  } else if (*error == ERR_NONE) {
-    *error = ERR_INTERNAL;
-  }
-  Pose_Destroy(source_pose);
-  Pose_Destroy(destination_pose);
-  AnimTrack_Destroy(track);
-  if (*error != ERR_NONE) {
-    AnimationClip_Destroy(clip);
-    return NULL;
-  }
-  return clip;
-}
-
 static ErrorCode convertTrack(FILE *output, ConvertSession *session, const Args *args,
     size_t animation) {
   ErrorCode error;
   size_t bytes = 0;
-  AnimationClip *clip = retargetTrack(session, args, animation, &error);
+  AnimationClip *clip = TrackConvert_Clip(session, animation, args->has_fps, args->fps, &error);
   char *path;
   if (clip == NULL) {
     return error;

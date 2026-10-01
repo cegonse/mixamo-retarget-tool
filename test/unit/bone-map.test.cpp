@@ -85,6 +85,18 @@ describe("BoneMap", []() {
     remove(path.c_str());
   });
 
+  it("reads map text with comments, blank lines and CRLF endings", []() {
+    expect((int)BoneMap_AddText(map, "# header\r\n\npelvis=mixamorig:Hips # trailing\r\nspine_01=mixamorig:Spine"))
+      .toBe((int)ERR_NONE);
+    expect(BoneMap_PairCount(map)).toBe((size_t)2);
+    expect(std::string(BoneMap_DestinationName(map, 1))).toBe("mixamorig:Spine");
+  });
+
+  it("names a bad map text entry", []() {
+    expect((int)BoneMap_AddText(map, "pelvis=mixamorig:Hips\nnonsense\n")).toBe((int)ERR_BAD_ARGS);
+    expect(std::string(BoneMap_ErrorMessage(map))).toMatch("nonsense");
+  });
+
   it("reports a missing map file as ERR_OPEN_INPUT", []() {
     expect((int)BoneMap_AddFile(map, FIXTURES_DIR "/missing.map")).toBe((int)ERR_OPEN_INPUT);
   });

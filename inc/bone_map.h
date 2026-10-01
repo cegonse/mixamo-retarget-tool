@@ -11,6 +11,7 @@ BoneMap *BoneMap_Create(void);
 void BoneMap_Destroy(BoneMap *self);
 ErrorCode BoneMap_AddPairs(BoneMap *self, const char *text);
 ErrorCode BoneMap_AddFile(BoneMap *self, const char *path);
+ErrorCode BoneMap_AddText(BoneMap *self, const char *text);
 const char *BoneMap_ErrorMessage(const BoneMap *self);
 size_t BoneMap_PairCount(const BoneMap *self);
 const char *BoneMap_SourceName(const BoneMap *self, size_t pair);

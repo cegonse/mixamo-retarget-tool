@@ -185,6 +185,47 @@ build/anim-retarget convert test/data/UAL1_Standard_RM.glb test/data/test_player
 - Optional Khronos glTF-Validator download in `init.sh` and an
   acceptance gate running it on every produced file when present.
 
+### Phase 11 — Web tool: Emscripten build, session, UI and export
+- Core seams, shared with the CLI so the browser produces byte-identical
+  files: `BoneMap_AddText` (map-file syntax from memory) and a
+  `track_convert` module extracted from `convert_command`
+  (`TrackConvert_Clip`: sample + retarget one track into an
+  `AnimationClip`).
+- `web-tool/` (`docs/web-tool.md`): `inc/web_session.h` +
+  `src/web_session.c` — pure C, compiled into the native test suite —
+  loads source and destination independently, keeps map text + options,
+  rebuilds the retarget when either side changes, and yields a clip or
+  GLB bytes per track with CLI-identical file names. `src/web_api.c`
+  (`EMSCRIPTEN_KEEPALIVE` exports over one static session),
+  `src/web_viewer.c` (raylib 6: model load, fit-to-view, built-in camera
+  modes, bone overlay), `src/web_main.c`, `www/` (index.html, app.js,
+  style.css), `CMakeLists.txt` (configure with `emcmake`).
+- `scripts/init-web.sh` fetches the raylib 6.0 WebAssembly release into
+  `external/raylib` (sha256-verified) and checks for `emcc`; `make web`
+  builds `build-web/`, `make web-serve` serves it.
+- Tests: `web-session.test.cpp`, `track-convert.test.cpp`, a
+  `BoneMap_AddText` case. Manual: open both fixtures in Chrome, 43 tracks
+  listed, exported files load with `anim-retarget info`.
+- Docs: `docs/web-tool.md`, `libraries.md` (raylib, Emscripten), README,
+  CLAUDE.md map, development guidelines layout.
+
+**Findings (2026-10-01).** The first browser export of `Idle_Loop` had
+the hips ~100° off while the CLI's was right: `retarget_frame.c` called
+`glm_quat_mul(a, b, b)` three times (and `retarget_setup.c` once). cglm's
+SSE path tolerates that, its scalar path (WebAssembly) does not. Fixed
+with temporaries; `scalar-math.test.cpp` now runs the retarget without
+SSE. After the fix the browser and CLI outputs agree to float rounding
+(SSE vs scalar summation order), with identical JSON chunks.
+
+### Phase 12 — Web tool: animation playback in the viewer
+- Clicking a track previews it on the destination model: the retargeted
+  clip becomes a raylib `ModelAnimation` (world-space keyframe poses in
+  skin order, from `Pose_ComputeGlobals`), `UpdateModelAnimation` drives
+  CPU skinning; play/pause, frame slider and frame label, looping; the
+  bone overlay follows `model.currentPose`.
+- Tests: the clip → skin-order world-pose conversion is tested natively;
+  the raylib draw loop stays untested.
+
 ## Decisions already made (don't relitigate)
 
 - cgltf reads, json-c writes, cglm does the math; all three vendored as

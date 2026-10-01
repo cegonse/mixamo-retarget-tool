@@ -13,6 +13,10 @@ needed today; the only system library linked is `libm`.
 | **cgltf** | `v1.15` | `third_party/cgltf/cgltf.h` | MIT | read GLB/glTF: container, JSON, accessors, node transforms |
 | **cglm** | `v0.9.6` | `third_party/cglm/include/` | MIT | vectors, quaternions, matrices (header-only inline API) |
 | **json-c** | `json-c-0.19-20260627` | `third_party/json-c/` | MIT | build and serialise the output glTF JSON |
+| **raylib** (web tool only) | `6.0` WebAssembly release | `external/raylib/` (fetched by `scripts/init-web.sh`, not vendored) | zlib | render the destination model and drive the camera in the browser viewer |
+
+The browser build also needs the **Emscripten SDK** (`emcc`, `emcmake`;
+verified with 5.0.4), installed outside the repo and found on `PATH`.
 
 ## cgltf (read side)
 
@@ -88,6 +92,13 @@ Measured behaviour (phase 1, pinned by `transform.test.cpp`):
   makes `to` sign-continuous with `from` first, then slerps and
   normalises; always use it instead of calling `glm_quat_slerp` directly.
 
+- **Aliasing.** `glm_quat_mul`, `glm_quat_rotate`, `glm_mat4_mul` and
+  friends are only aliasing-safe (`dest` equal to an input) in their
+  SSE/NEON/WASM-SIMD paths; the plain-C fallbacks are not. The
+  WebAssembly build uses the fallbacks, so the tool never aliases
+  (`development-guidelines.md`), and `scalar-math.test.cpp` runs the
+  retarget with the SSE macros undefined.
+
 Not in cglm, written in-house: the 4×4 symmetric **Jacobi eigen solver**
 used by the Horn/Umeyama frame alignment, cubic-spline keyframe
 evaluation, and the shear check on decomposed `matrix` nodes.
@@ -129,6 +140,21 @@ Calls used (`glb_writer`):
 
 json-c is not used for reading: cgltf parses the input itself.
 
+## raylib (web viewer)
+
+Prebuilt `lib/libraylib.web.a` + `include/{raylib,raymath,rlgl}.h` from
+https://github.com/raysan5/raylib/releases/download/6.0/raylib-6.0_webassembly.zip,
+sha256-verified by `scripts/init-web.sh`, linked with `-sUSE_GLFW=3`.
+Used only by `web-tool/src/web_viewer.c` (`docs/web-tool.md`):
+`LoadModel`/`UnloadModel`/`DrawModel` (glTF mesh + skin + textures),
+`UpdateCamera` (`CAMERA_THIRD_PERSON`, `CAMERA_FREE`) and
+`UpdateCameraPro`, `DrawGrid`/`DrawLine3D`/`DrawSphere`,
+`rlDisableDepthTest`, `SetWindowSize`, raymath for the display-only fit
+matrix; phase 12 adds `UpdateModelAnimation` with a `ModelAnimation`
+built from the retargeted clip. The library bundles its own cgltf (a
+newer 1.15 snapshot with a different `cgltf_data` layout), hence the
+symbol rename in `web-tool/inc/cgltf_rename.h`.
+
 ## Don't reimplement
 
 | Job | Use |
@@ -138,6 +164,7 @@ json-c is not used for reading: cgltf parses the input itself.
 | JSON tree building, string escaping, serialisation | json-c |
 | GLB framing on **write** (12-byte header + JSON chunk + BIN chunk, padding) | in-house, ~30 lines (`glb_writer`) |
 | Horn/Umeyama solve, Jacobi 4×4 eigen, keyframe sampling, retargeting | in-house |
+| Skinned mesh rendering, camera control, canvas/WebGL plumbing (web tool) | raylib + Emscripten |
 
 ## Submodule workflow
 

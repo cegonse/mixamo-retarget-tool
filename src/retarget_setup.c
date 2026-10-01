@@ -15,12 +15,12 @@ void RetargetOptions_Default(RetargetOptions *dest) {
 }
 
 static void rotationFromDegrees(vec3 degrees, versor dest) {
-  versor about_x, about_y, about_z;
+  versor about_x, about_y, about_z, about_zy;
   glm_quatv(about_x, glm_rad(degrees[0]), (vec3){1.0f, 0.0f, 0.0f});
   glm_quatv(about_y, glm_rad(degrees[1]), (vec3){0.0f, 1.0f, 0.0f});
   glm_quatv(about_z, glm_rad(degrees[2]), (vec3){0.0f, 0.0f, 1.0f});
-  glm_quat_mul(about_z, about_y, dest);
-  glm_quat_mul(dest, about_x, dest);
+  glm_quat_mul(about_z, about_y, about_zy);
+  glm_quat_mul(about_zy, about_x, dest);
 }
 
 static ErrorCode solveAlignment(Retarget *self, const RetargetOptions *options) {

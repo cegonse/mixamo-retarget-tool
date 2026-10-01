@@ -56,6 +56,20 @@ rigs rest in T-pose (see the phase 9 findings in `PLAN.md`).
 Every flag is described in [docs/cli.md](docs/cli.md). Bone maps live in
 [docs/mappings/](docs/mappings/).
 
+## Web tool
+
+The same converter runs in the browser (`web-tool/`, built with
+Emscripten, viewer in raylib): open the source and destination GLBs,
+tick the tracks, edit the bone map and options, export.
+
+```
+make init-web  # raylib 6.0 WebAssembly release into external/ (needs emcc on PATH)
+make web       # build-web/
+make web-serve # http://localhost:8080
+```
+
+See [docs/web-tool.md](docs/web-tool.md).
+
 ## Documentation
 
 | Doc | Covers |
@@ -64,6 +78,7 @@ Every flag is described in [docs/cli.md](docs/cli.md). Bone maps live in
 | [docs/cli.md](docs/cli.md) | Commands, flags, output, exit codes |
 | [docs/retargeting.md](docs/retargeting.md) | The retargeting math |
 | [docs/glb-subset.md](docs/glb-subset.md) | What is read and written; fixture facts |
-| [docs/libraries.md](docs/libraries.md) | cgltf, cglm, json-c and what each does |
+| [docs/libraries.md](docs/libraries.md) | cgltf, cglm, json-c, raylib and what each does |
+| [docs/web-tool.md](docs/web-tool.md) | The browser front end: layout, exports, viewer |
 | [docs/development-guidelines.md](docs/development-guidelines.md) | Code conventions |
 | [docs/testing-guidelines.md](docs/testing-guidelines.md) | Test layout and expectations |

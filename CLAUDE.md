@@ -34,6 +34,7 @@ Full CLI in `docs/cli.md`.
 | `docs/retargeting.md` | **The core spec**: sampling, frame alignment, rest correction, rotation/translation retarget | the retargeter |
 | `docs/cli.md` | Commands, flags, output text, exit codes | `args`/`app` |
 | `docs/mappings/*.map` | Maintained bone maps (Mixamo identity; UAL → Mixamo draft) | acceptance tests, phase 9 |
+| `docs/web-tool.md` | Browser front end in `web-tool/`: Emscripten build, exported C API, raylib viewer, the cgltf rename and keyboard-capture gotchas | touching `web-tool/` |
 
 ## Commit protocol — VERY IMPORTANT
 
@@ -47,7 +48,9 @@ Full CLI in `docs/cli.md`.
 
 ## Locked decisions (don't relitigate)
 
-- **Three vendored libraries, pinned submodules in `third_party/`:**
+- **Three vendored libraries, pinned submodules in `third_party/`** (plus
+  raylib's prebuilt WebAssembly build in `external/raylib`, web tool
+  only, fetched by `scripts/init-web.sh`):
   **cgltf** reads GLB/glTF (container, JSON, accessors), **json-c**
   builds and serialises the output JSON, **cglm** does all vector/
   quaternion/matrix math (header-only). `cgltf_write.h` is not used.
@@ -101,6 +104,8 @@ CMake, C99, out-of-source; the `Makefile` is a thin wrapper.
 make init          # git submodule update --init; fetch Cest into external/ (once)
 make               # build/anim-retarget (json-c built from third_party/)
 make test          # build tool + test binaries, run cest-runner build/
+make web           # Emscripten build of the browser tool into build-web/ (emcc on PATH)
+make web-serve     # serve build-web/ on http://localhost:8080
 ```
 
 Conventions (full detail in `docs/development-guidelines.md`): C99, libc
