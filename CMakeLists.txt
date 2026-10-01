@@ -61,6 +61,7 @@ foreach(TEST_FILE ${TEST_FILES})
   target_link_libraries(${EXEC_NAME} PRIVATE json-c m)
   target_compile_definitions(${EXEC_NAME} PRIVATE
     FIXTURES_DIR="${CMAKE_SOURCE_DIR}/test/data"
+    DOCS_DIR="${CMAKE_SOURCE_DIR}/docs"
     TEST_OUTPUT_DIR="${CMAKE_BINARY_DIR}/test-output")
   add_test(NAME ${EXEC_NAME} COMMAND ${EXEC_NAME})
   add_dependencies(build_tests ${EXEC_NAME})
