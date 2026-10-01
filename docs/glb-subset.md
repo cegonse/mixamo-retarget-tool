@@ -233,4 +233,7 @@ with root motion ("RM").
   the Procrustes `k` will land between the two; phase 9 decides whether
   the hips-height ratio should override it for root translation
   (`--frame-scale`).
+- `Swim_Idle_Loop` moves the pelvis to −0.33…−0.43 m (below the
+  library's floor) and `Swim_Fwd_Loop` to ≈ −0.07 m: swimming tracks are
+  the one legitimate case of hips below the destination's feet.
 - 2 materials, no textures/images; mesh has `TEXCOORD_1`. All ignored.

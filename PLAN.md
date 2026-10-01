@@ -141,6 +141,45 @@ Each phase is one commit. Module names are the `inc/<name>.h` /
   pose whose joint rotations equal the destination rest within a few
   degrees.
 
+**Findings (automated part, 2026-10-01)** — measured on the converted
+files with the tool's own reader (`test/acceptance/real-library.test.cpp`):
+
+| Check | Result |
+|-------|--------|
+| Up axis | head 200–223 units above hips along −Z on every frame ✔ |
+| Facing | toes point +Y, the same as the destination rest ✔ |
+| Frame alignment | `Q` = (−91.0°, 0.1°, 0.0°), `k` = 401.4, rms 34.5 (13 % of spread) |
+| `A_TPose`, default options | up to **40.8°** off the destination rest (shoulders/arms) ✘ |
+| `A_TPose`, `--no-rest-align` | **0.0°** off the destination rest ✔ |
+| Idle foot contact, default | feet float ~7 units |
+| Idle foot contact, `--no-rest-align` | feet within ±0.5 units of the floor ✔ |
+| `--frame-scale 450` (hips-height ratio) | foot contact worse on every track tested; not adopted |
+| Crouch / Walk / Jog contact | planted feet sink up to ~35–40 units at some frames (legs are not a scaled copy; needs IK, out of scope) |
+| Loop seams (in-place Jog/Walk, Idle) | ≤ 0.04 units ✔ |
+| `Sword_Attack` | travels 1.5 m (602 units); convert with `--in-place` for an in-place clip |
+| `Swim_Idle_Loop` | hips 87–127 units below the floor — faithful: the source pelvis is at −0.33…−0.43 m |
+
+Conclusion: the rest-direction correction is the wrong default for this
+pair. Both rigs rest in T-pose, so the 40° it adds is bone-geometry
+difference (the UE clavicle runs backwards from the spine, the Mixamo
+arms rest ~17° down), not pose difference. The default stays as locked
+(on) until the in-engine check confirms; the recommended UAL command
+adds `--no-rest-align` and the acceptance test uses it. **Decision
+pending for the user:** flip the default (add `--rest-align`) if the
+engine agrees.
+
+Still manual (needs the engine): load `out/phase9/*.glb` next to
+`sword_run.glb` and check arm/hand twist, foot sliding, and start time 0
+vs 1/30. Regenerate with:
+```
+build/anim-retarget convert test/data/UAL1_Standard_RM.glb test/data/test_player.glb \
+  --anim Jog_Fwd_Loop,Walk_Loop,Sword_Attack --map-file docs/mappings/ual-to-mixamo.map \
+  --out-dir out/phase9 --in-place --no-rest-align
+build/anim-retarget convert test/data/UAL1_Standard_RM.glb test/data/test_player.glb \
+  --anim Idle_Loop,Pistol_Idle_Loop,A_TPose --map-file docs/mappings/ual-to-mixamo.map \
+  --out-dir out/phase9 --no-rest-align
+```
+
 ### Phase 10 — Polish (optional)
 - `--bone-offset d=X,Y,Z` manual twist fix if phase 9 needs it.
 - Optional Khronos glTF-Validator download in `init.sh` and an

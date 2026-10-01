@@ -44,11 +44,14 @@ build/anim-retarget info test/data/UAL1_Standard_RM.glb
 
 build/anim-retarget convert test/data/UAL1_Standard_RM.glb test/data/test_player.glb \
   --anim Jog_Fwd_Loop,Walk_Loop --map-file docs/mappings/ual-to-mixamo.map \
-  --out-dir out/ual --in-place
+  --out-dir out/ual --in-place --no-rest-align
 
 build/anim-retarget convert test/data/UAL1_Standard_RM.glb test/data/test_player.glb \
-  --all-anims --map-file docs/mappings/ual-to-mixamo.map --out-dir out/ual
+  --all-anims --map-file docs/mappings/ual-to-mixamo.map --out-dir out/ual --no-rest-align
 ```
+
+`--no-rest-align` is recommended for the UAL → Mixamo pair because both
+rigs rest in T-pose (see the phase 9 findings in `PLAN.md`).
 
 Every flag is described in [docs/cli.md](docs/cli.md). Bone maps live in
 [docs/mappings/](docs/mappings/).

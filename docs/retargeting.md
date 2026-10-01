@@ -109,6 +109,9 @@ For the real pair the proportions differ (height ratio ×352, hips-height
 ratio ×450), so `k` is a compromise; if feet sink or float in-engine,
 `--frame-scale 450` (hips height) is the first thing to try, and phase 9
 may make the hips-height ratio the default for root translation.
+Phase 9 measured it: `k` = 401 already gives floor contact on idle
+tracks with `--no-rest-align`, and 450 makes contact worse on every
+track tested, so the Procrustes `k` stays the default.
 
 ## 4. Rest-pose correction (A-pose vs T-pose)
 
@@ -136,6 +139,17 @@ axis is **not** corrected (minimal arc has no twist information); this is
 a known limitation and the reason `--no-rest-align` exists. A future
 per-bone manual offset (`--bone-offset d=X,Y,Z`) is an extension point,
 not part of the plan.
+
+**Phase 9 finding.** The correction cannot tell a *pose* difference
+(A vs T) from a *bone-geometry* difference. On `UAL1_Standard_RM` →
+`test_player` both rigs rest in T-pose, yet the arcs reach ~40° at the
+shoulders (UE clavicles run backwards from the spine; Mixamo arms rest
+~17° down), so with the correction on, `A_TPose` lands 40.8° away from
+the destination rest and the idle feet float ~7 units. With
+`--no-rest-align` (`A = I`) `A_TPose` reproduces the destination rest
+exactly and the idle feet stay on the floor. Use `--no-rest-align`
+whenever both rigs rest in the same pose family; keep the correction
+for genuine A-pose ↔ T-pose pairs.
 
 ## 5. Rotation retargeting
 

@@ -81,6 +81,11 @@ The developer's current machine (Linux x86_64) resolves to
   likewise reported only as a silent exit 1; bisect with
   `build/test_<name> -g "<case>"`, then read the report with
   `ASAN_OPTIONS=log_path=/tmp/asan build/test_<name> -g "<case>"`.
+  Cest's leak check runs after every test and its message **replaces**
+  a failed assertion's: an `expect` that throws while a test holds heap
+  objects shows up only as "potential memory leaks". Own test resources
+  with RAII (a small struct with a destructor) or collect results and
+  assert after cleanup.
 - **Focus/skip** - `fit`/`xit`, `fdescribe`/`xdescribe`, `todo(...)`.
 - **Parametrized** - `withParameter<T>().withValue(...).thenDo([](T x){...})`
   for table-driven cases.

@@ -102,10 +102,14 @@ anim-retarget convert test/data/sword_run.glb test/data/test_player.glb \
 ```
 anim-retarget info test/data/UAL1_Standard_RM.glb        # discover names
 anim-retarget convert test/data/UAL1_Standard_RM.glb test/data/test_player.glb \
-  --anim Jog_Fwd_Loop,Walk_Loop --map-file docs/mappings/ual-to-mixamo.map --out-dir out/ual --in-place
+  --anim Jog_Fwd_Loop,Walk_Loop --map-file docs/mappings/ual-to-mixamo.map --out-dir out/ual \
+  --in-place --no-rest-align
 anim-retarget convert test/data/UAL1_Standard_RM.glb test/data/test_player.glb \
-  --all-anims --map-file docs/mappings/ual-to-mixamo.map --out-dir out/ual
+  --all-anims --map-file docs/mappings/ual-to-mixamo.map --out-dir out/ual --no-rest-align
 ```
+
+Both rigs rest in T-pose, so `--no-rest-align` is recommended for this
+pair (`retargeting.md` §4, phase 9 finding).
 
 `docs/mappings/` holds the maintained map files (identity map for the
 Mixamo rig; UAL → Mixamo once the real fixture exists).
