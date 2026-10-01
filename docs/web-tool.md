@@ -18,7 +18,9 @@ web-tool/
 ├── src/
 │   ├── web_session.c     # pure C, compiled into the native test suite
 │   ├── web_api.c         # EMSCRIPTEN_KEEPALIVE exports, one static session
-│   ├── web_viewer.c      # raylib: model load, fit-to-view, camera, bone overlay
+│   ├── web_pose.c        # clip → world-space poses in skin order (tested natively)
+│   ├── web_viewer.c      # raylib: model load, camera, bone overlay, playback
+│   ├── web_viewer_fit.c  # display-only fit matrix (up axis, scale, grounding)
 │   └── web_main.c        # main(): start the viewer loop
 └── www/
     ├── index.html        # top bar + two columns
@@ -51,8 +53,10 @@ HTTP (file URLs cannot load the `.wasm` fetch).
   frame alignment, rest-direction correction, output fps) and the solved
   frame-alignment line; at the bottom **Export selected** and **Export
   all**.
-- **Right column**: the raylib canvas, and a bar with the bone-overlay
-  toggle, "Reset camera" and the mouse hints.
+- **Right column**: the raylib canvas, and a bar with Play/Pause, the
+  frame slider and label, the bone-overlay toggle, "Reset camera" and
+  the mouse hints. Clicking a track *name* previews it (the checkbox
+  only selects for export); the previewed row is highlighted.
 
 Any change to the map text or an option re-runs the configuration
 (debounced); the export buttons enable only when both files are loaded
@@ -98,6 +102,8 @@ one download per file elsewhere.
 | `web_alignment_text()` | the `frame: rotate … scale … rms …` line |
 | `web_build_glb(i)` → size, `web_glb_data()`, `web_glb_release()` | export bytes |
 | `web_resize(w, h)`, `web_set_show_bones(b)`, `web_reset_camera()` | viewer |
+| `web_preview(i)` → frames, `web_refresh_preview()` | retarget track `i` and load it into the viewer; refresh re-runs the current preview after a configure/load |
+| `web_set_playing(b)`, `web_is_playing()`, `web_set_frame(f)`, `web_frame()`, `web_frame_count()` | playback |
 
 Strings cross with `ccall(..., ['string'])` and `UTF8ToString`; bytes
 with `HEAPU8.slice`, copied before the next call because the heap can
@@ -107,8 +113,18 @@ move on growth (`ALLOW_MEMORY_GROWTH`).
 
 - raylib loads the destination GLB itself (`LoadModel` from MEMFS, mesh,
   skin and embedded textures). Its skeleton bind pose is world space,
-  the same convention as the tool's `Pose_Global`, which is what phase 12
-  relies on to feed retargeted frames to `UpdateModelAnimation`.
+  the same convention as the tool's `Pose_Global`.
+- **Playback.** A preview runs `TrackConvert_Clip` for the track, then
+  `WebPoseSet_FromClip` turns the clip's local keys back into world-space
+  transforms per frame, ordered by **skin index** (raylib's bone order),
+  10 floats per joint (T, R, S). The viewer copies them into a raylib
+  `ModelAnimation` and calls `UpdateModelAnimation(model, anim, frame)`
+  with a fractional frame every draw, so raylib interpolates between
+  keys and CPU-skins the mesh; the bone overlay reads
+  `model.currentPose`. The playhead advances by `GetFrameTime()` and
+  wraps at the clip length; scrubbing the slider pauses and seeks.
+  Changing the map or an option re-runs the preview. Clearing the
+  preview resets the mesh to its bind pose.
 - **Display-only fit.** The destination file is shown as-is in data; for
   display the viewer rotates the model so the skeleton's up axis points
   to raylib's +Y, scales it to 2 units tall and puts the lowest joint on
@@ -143,10 +159,8 @@ move on growth (`ALLOW_MEMORY_GROWTH`).
   `app.js` registers its own capturing listeners *before* the module is
   created and stops propagation for events targeted at inputs.
 
-## Limits (phase 11)
+## Limits
 
-- No playback yet: the viewer shows the destination model at rest; phase
-  12 adds the retargeted clip, play/pause and the frame scrubber.
 - A destination without a mesh (e.g. `sword_run.glb`) converts fine but
   shows nothing in the viewer (a warning is printed).
 - `--src-up`, `--frame-rotate` and `--frame-scale` are not exposed; the

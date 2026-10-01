@@ -65,9 +65,12 @@
         <canvas id="canvas" tabindex="-1"></canvas>
       </div>
       <div class="viewer-bar">
+        <button id="play" disabled>Play</button>
+        <input type="range" id="frame" min="0" max="0" value="0" disabled>
+        <span id="frame-label" class="frame-label">no preview</span>
         <label><input type="checkbox" id="show-bones" checked> Bones</label>
         <button id="reset-camera">Reset camera</button>
-        <span class="hint">left drag: orbit · middle or right drag: pan · wheel: zoom</span>
+        <span class="hint">click a track to preview · left drag: orbit · middle or right drag: pan · wheel: zoom</span>
       </div>
     </section>
   </main>

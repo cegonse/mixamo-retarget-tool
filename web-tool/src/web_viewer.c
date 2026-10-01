@@ -3,7 +3,10 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <rlgl.h>
+#include <stdlib.h>
+#include <string.h>
 #include <web_viewer.h>
+#include <web_viewer_fit.h>
 
 enum { DEFAULT_WIDTH = 960, DEFAULT_HEIGHT = 640, GRID_SLICES = 12 };
 
@@ -16,95 +19,62 @@ static Model model;
 static int has_model = 0;
 static int show_bones = 1;
 static Camera3D camera;
+static ModelAnimation animation;
+static int has_animation = 0;
+static float animation_fps = 30.0f;
+static int playing = 0;
+static float playhead = 0.0f;
 
 static Vector3 bindPosition(int bone) {
   return model.skeleton.bindPose[bone].translation;
 }
 
-static Vector3 dominantAxis(Vector3 direction) {
-  float x = fabsf(direction.x), y = fabsf(direction.y), z = fabsf(direction.z);
-  if (x >= y && x >= z) {
-    return (Vector3){direction.x < 0.0f ? -1.0f : 1.0f, 0.0f, 0.0f};
-  }
-  if (z > y) {
-    return (Vector3){0.0f, 0.0f, direction.z < 0.0f ? -1.0f : 1.0f};
-  }
-  return (Vector3){0.0f, direction.y < 0.0f ? -1.0f : 1.0f, 0.0f};
+static void resetToBindPose(void) {
+  ModelAnimation rest = {0};
+  Transform *bind_pose = model.skeleton.bindPose;
+  rest.boneCount = model.skeleton.boneCount;
+  rest.keyframeCount = 1;
+  rest.keyframePoses = &bind_pose;
+  UpdateModelAnimation(model, rest, 0.0f);
 }
 
-static int descendantCount(int bone) {
-  int count = 0, other;
-  for (other = 0; other < model.skeleton.boneCount; other++) {
-    int ancestor = model.skeleton.bones[other].parent;
-    while (ancestor >= 0 && ancestor != bone) {
-      ancestor = model.skeleton.bones[ancestor].parent;
-    }
-    count += ancestor == bone;
-  }
-  return count;
+static Vector3 shownPosition(int bone) {
+  return has_animation ? model.currentPose[bone].translation : bindPosition(bone);
 }
 
-static int rootBone(void) {
-  int bone;
-  for (bone = 0; bone < model.skeleton.boneCount; bone++) {
-    if (model.skeleton.bones[bone].parent < 0) {
-      return bone;
+static float currentFrame(void) {
+  return has_animation ? fmodf(playhead * animation_fps, (float)animation.keyframeCount) : 0.0f;
+}
+
+static void advancePlayhead(void) {
+  if (has_animation && playing) {
+    playhead += GetFrameTime();
+    if (playhead * animation_fps >= (float)animation.keyframeCount) {
+      playhead -= (float)animation.keyframeCount / animation_fps;
     }
   }
-  return 0;
 }
 
-static int spineBone(int root) {
-  int bone, best = -1, best_count = -1;
-  for (bone = 0; bone < model.skeleton.boneCount; bone++) {
-    if (model.skeleton.bones[bone].parent == root && descendantCount(bone) > best_count) {
-      best = bone;
-      best_count = descendantCount(bone);
-    }
-  }
-  return best;
-}
-
-static Vector3 skeletonUp(void) {
-  int root = rootBone(), spine;
-  if (model.skeleton.boneCount == 0) {
-    return (Vector3){0.0f, 1.0f, 0.0f};
-  }
-  spine = spineBone(root);
-  if (spine < 0) {
-    return dominantAxis(bindPosition(root));
-  }
-  return dominantAxis(Vector3Subtract(bindPosition(spine), bindPosition(root)));
-}
-
-static Quaternion rotationToY(Vector3 up) {
-  Vector3 y = {0.0f, 1.0f, 0.0f};
-  up = Vector3Normalize(up);
-  if (Vector3DotProduct(up, y) < -0.9999f) {
-    return QuaternionFromAxisAngle((Vector3){1.0f, 0.0f, 0.0f}, PI);
-  }
-  return QuaternionFromVector3ToVector3(up, y);
-}
-
-static void fitModel(void) {
-  Matrix rotate = QuaternionToMatrix(rotationToY(skeletonUp()));
-  float min_y = INFINITY, max_y = -INFINITY, scale;
-  Vector3 sum = {0};
-  int bone;
-  if (model.skeleton.boneCount == 0) {
-    model.transform = MatrixIdentity();
+static void freeAnimation(void) {
+  int frame;
+  if (!has_animation) {
     return;
   }
-  for (bone = 0; bone < model.skeleton.boneCount; bone++) {
-    Vector3 position = Vector3Transform(bindPosition(bone), rotate);
-    min_y = fminf(min_y, position.y);
-    max_y = fmaxf(max_y, position.y);
-    sum = Vector3Add(sum, position);
+  for (frame = 0; frame < animation.keyframeCount; frame++) {
+    free(animation.keyframePoses[frame]);
   }
-  scale = max_y - min_y > 1e-6f ? character_height / (max_y - min_y) : 1.0f;
-  sum = Vector3Scale(sum, scale / (float)model.skeleton.boneCount);
-  model.transform = MatrixMultiply(MatrixMultiply(rotate, MatrixScale(scale, scale, scale)),
-    MatrixTranslate(-sum.x, -min_y * scale, -sum.z));
+  free(animation.keyframePoses);
+  has_animation = 0;
+}
+
+static void fillKeyframe(Transform *keyframe, const float *values, size_t joint_count) {
+  size_t joint;
+  for (joint = 0; joint < joint_count; joint++) {
+    const float *slot = values + joint * 10;
+    keyframe[joint].translation = (Vector3){slot[0], slot[1], slot[2]};
+    keyframe[joint].rotation = (Quaternion){slot[3], slot[4], slot[5], slot[6]};
+    keyframe[joint].scale = (Vector3){slot[7], slot[8], slot[9]};
+  }
 }
 
 static void drawBones(void) {
@@ -112,10 +82,10 @@ static void drawBones(void) {
   rlDrawRenderBatchActive();
   rlDisableDepthTest();
   for (bone = 0; bone < model.skeleton.boneCount; bone++) {
-    Vector3 position = Vector3Transform(bindPosition(bone), model.transform);
+    Vector3 position = Vector3Transform(shownPosition(bone), model.transform);
     int parent = model.skeleton.bones[bone].parent;
     if (parent >= 0) {
-      DrawLine3D(Vector3Transform(bindPosition(parent), model.transform), position, YELLOW);
+      DrawLine3D(Vector3Transform(shownPosition(parent), model.transform), position, YELLOW);
     }
     DrawSphere(position, joint_radius, ORANGE);
   }
@@ -139,6 +109,10 @@ static void updateCamera(void) {
 
 static void drawFrame(void) {
   updateCamera();
+  advancePlayhead();
+  if (has_animation) {
+    UpdateModelAnimation(model, animation, currentFrame());
+  }
   BeginDrawing();
   ClearBackground(background);
   BeginMode3D(camera);
@@ -175,6 +149,7 @@ void WebViewer_Resize(int width, int height) {
 }
 
 int WebViewer_LoadModel(const char *path) {
+  freeAnimation();
   if (has_model) {
     UnloadModel(model);
     has_model = 0;
@@ -185,10 +160,69 @@ int WebViewer_LoadModel(const char *path) {
     return -1;
   }
   has_model = 1;
-  fitModel();
+  model.transform = WebViewerFit_Matrix(&model, character_height);
   return model.skeleton.boneCount;
 }
 
 void WebViewer_SetShowBones(int show) {
   show_bones = show;
+}
+
+int WebViewer_SetAnimation(size_t frame_count, size_t joint_count, float fps,
+    const float *poses) {
+  size_t frame;
+  freeAnimation();
+  if (!has_model || frame_count == 0 || (int)joint_count != model.skeleton.boneCount) {
+    return -1;
+  }
+  memset(&animation, 0, sizeof animation);
+  animation.boneCount = (int)joint_count;
+  animation.keyframeCount = (int)frame_count;
+  animation.keyframePoses = calloc(frame_count, sizeof *animation.keyframePoses);
+  if (animation.keyframePoses == NULL) {
+    return -1;
+  }
+  for (frame = 0; frame < frame_count; frame++) {
+    animation.keyframePoses[frame] = calloc(joint_count, sizeof **animation.keyframePoses);
+    if (animation.keyframePoses[frame] == NULL) {
+      animation.keyframeCount = (int)frame;
+      has_animation = 1;
+      freeAnimation();
+      return -1;
+    }
+    fillKeyframe(animation.keyframePoses[frame], poses + frame * joint_count * 10, joint_count);
+  }
+  animation_fps = fps > 0.0f ? fps : 30.0f;
+  playhead = 0.0f;
+  has_animation = 1;
+  return (int)frame_count;
+}
+
+void WebViewer_ClearAnimation(void) {
+  freeAnimation();
+  if (has_model) {
+    resetToBindPose();
+  }
+}
+
+void WebViewer_SetPlaying(int should_play) {
+  playing = should_play && has_animation;
+}
+
+int WebViewer_IsPlaying(void) {
+  return playing;
+}
+
+void WebViewer_SetFrame(int frame) {
+  if (has_animation && frame >= 0 && frame < animation.keyframeCount) {
+    playhead = (float)frame / animation_fps;
+  }
+}
+
+int WebViewer_Frame(void) {
+  return (int)currentFrame();
+}
+
+int WebViewer_FrameCount(void) {
+  return has_animation ? animation.keyframeCount : 0;
 }

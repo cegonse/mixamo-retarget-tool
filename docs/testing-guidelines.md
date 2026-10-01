@@ -307,9 +307,12 @@ functions are not safe when `dest` aliases an input while the SSE ones
 are, so an aliased call passes every other test and fails only in the
 browser.
 
-**Web session.** `web-session.test.cpp` covers `web-tool/src/web_session.c`
-(incremental loads, map text, options, clip and GLB bytes, file names);
-the root CMake compiles that file into every test executable.
+**Web session and poses.** `web-session.test.cpp` covers
+`web-tool/src/web_session.c` (incremental loads, map text, options, clip
+and GLB bytes, file names) and `web-pose.test.cpp` covers
+`web-tool/src/web_pose.c` (clip → world-space poses in skin order); the
+root CMake compiles both files into every test executable. The raylib
+draw loop itself has no automated test.
 
 ## Acceptance tests (whole-app, always green)
 

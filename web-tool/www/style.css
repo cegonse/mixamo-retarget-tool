@@ -79,6 +79,7 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 .animation-list li { border-bottom: 1px solid var(--border); }
 .animation-list label { display: flex; align-items: center; gap: 8px; padding: 6px 14px; cursor: pointer; }
 .animation-list label:hover { background: var(--panel-2); }
+.animation-list li.active label { background: var(--panel-2); box-shadow: inset 3px 0 0 var(--accent); }
 .animation-list .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .animation-list .duration { color: var(--muted); font-family: ui-monospace, monospace; font-size: 12px; }
 .animation-list .empty { padding: 14px; color: var(--muted); }
@@ -132,4 +133,8 @@ button:disabled { opacity: 0.45; cursor: default; }
   background: var(--panel);
   border-top: 1px solid var(--border);
 }
-.viewer-bar .hint { margin-left: auto; color: var(--muted); font-size: 12px; }
+.viewer-bar > * { white-space: nowrap; flex-shrink: 0; }
+.viewer-bar .hint { margin-left: auto; color: var(--muted); font-size: 12px; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; }
+.viewer-bar #play { min-width: 64px; }
+.viewer-bar #frame { width: 220px; accent-color: var(--accent); }
+.viewer-bar .frame-label { font-family: ui-monospace, monospace; font-size: 12px; color: var(--muted); min-width: 110px; }

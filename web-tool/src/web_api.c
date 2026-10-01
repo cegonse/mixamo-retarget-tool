@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <transform.h>
+#include <web_pose.h>
 #include <web_session.h>
 #include <web_viewer.h>
 
@@ -108,4 +109,58 @@ EMSCRIPTEN_KEEPALIVE void web_set_show_bones(int show) {
 
 EMSCRIPTEN_KEEPALIVE void web_reset_camera(void) {
   WebViewer_ResetCamera();
+}
+
+static int preview_animation = -1;
+
+static int showPreview(void) {
+  ErrorCode error = ERR_NONE;
+  AnimationClip *clip;
+  WebPoseSet *poses;
+  int frames = -1;
+  if (preview_animation < 0 || !WebSession_IsReady(currentSession())) {
+    WebViewer_ClearAnimation();
+    return 0;
+  }
+  clip = WebSession_Clip(currentSession(), (size_t)preview_animation, &error);
+  poses = clip != NULL ? WebPoseSet_FromClip(clip, WebSession_Destination(currentSession())) : NULL;
+  if (poses != NULL) {
+    frames = WebViewer_SetAnimation(WebPoseSet_FrameCount(poses), WebPoseSet_JointCount(poses),
+      WebPoseSet_Fps(poses), WebPoseSet_Frame(poses, 0));
+  }
+  WebPoseSet_Destroy(poses);
+  AnimationClip_Destroy(clip);
+  return frames >= 0 ? frames : -(int)(error != ERR_NONE ? error : ERR_INTERNAL);
+}
+
+EMSCRIPTEN_KEEPALIVE int web_preview(int animation) {
+  int frames;
+  preview_animation = animation;
+  frames = showPreview();
+  WebViewer_SetPlaying(frames > 0);
+  return frames;
+}
+
+EMSCRIPTEN_KEEPALIVE int web_refresh_preview(void) {
+  return showPreview();
+}
+
+EMSCRIPTEN_KEEPALIVE void web_set_playing(int playing) {
+  WebViewer_SetPlaying(playing);
+}
+
+EMSCRIPTEN_KEEPALIVE int web_is_playing(void) {
+  return WebViewer_IsPlaying();
+}
+
+EMSCRIPTEN_KEEPALIVE void web_set_frame(int frame) {
+  WebViewer_SetFrame(frame);
+}
+
+EMSCRIPTEN_KEEPALIVE int web_frame(void) {
+  return WebViewer_Frame();
+}
+
+EMSCRIPTEN_KEEPALIVE int web_frame_count(void) {
+  return WebViewer_FrameCount();
 }

@@ -18,6 +18,8 @@ let Module = null;
 let sourceLoaded = false;
 let destinationLoaded = false;
 let configureTimer = null;
+let previewIndex = -1;
+let scrubbing = false;
 
 function isEditable(target) {
   return target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
@@ -97,6 +99,10 @@ function renderAnimationList() {
     box.addEventListener('change', updateButtons);
     name.className = 'name';
     name.textContent = Module.UTF8ToString(Module._web_animation_name(index));
+    name.addEventListener('click', (event) => {
+      event.preventDefault();
+      preview(index);
+    });
     duration.className = 'duration';
     duration.textContent = `${Module._web_animation_duration(index).toFixed(2)} s`;
     label.append(box, name, duration);
@@ -119,6 +125,7 @@ function configure() {
     setStatus('ready');
   }
   updateButtons();
+  refreshPreview();
 }
 
 function scheduleConfigure() {
@@ -138,6 +145,7 @@ async function loadGlb(file, path, exportName) {
 
 async function openSource(file) {
   setStatus(`loading ${file.name}…`);
+  previewIndex = -1;
   sourceLoaded = await loadGlb(file, SOURCE_PATH, 'web_load_source');
   ui.sourceName.textContent = sourceLoaded ? file.name : 'no source GLB';
   renderAnimationList();
@@ -155,6 +163,65 @@ async function openDestination(file) {
     setStatus(`${file.name} loaded`);
   }
   configure();
+}
+
+function markPreviewRow() {
+  for (const item of ui.animationList.querySelectorAll('li')) {
+    const box = item.querySelector('input[type=checkbox]');
+    item.classList.toggle('active', Boolean(box) && Number(box.dataset.index) === previewIndex);
+  }
+}
+
+function updatePlaybackControls() {
+  const count = Module ? Module._web_frame_count() : 0;
+  ui.play.disabled = count === 0;
+  ui.frame.disabled = count === 0;
+  ui.frame.max = String(Math.max(count - 1, 0));
+  if (count === 0) {
+    ui.frameLabel.textContent = 'no preview';
+    ui.play.textContent = 'Play';
+    return;
+  }
+  ui.play.textContent = Module._web_is_playing() ? 'Pause' : 'Play';
+  if (!scrubbing) {
+    ui.frame.value = String(Module._web_frame());
+  }
+  ui.frameLabel.textContent = `frame ${ui.frame.value} / ${count - 1}`;
+}
+
+function preview(index) {
+  if (!Module || !Module._web_is_ready()) {
+    setStatus('load both files and a valid map before previewing', true);
+    return;
+  }
+  const frames = Module._web_preview(index);
+  previewIndex = frames > 0 ? index : -1;
+  if (frames < 0) {
+    setStatus(`preview failed: ${errorName(-frames)}`, true);
+  } else {
+    setStatus(`previewing ${Module.UTF8ToString(Module._web_animation_name(index))} (${frames} frames)`);
+  }
+  markPreviewRow();
+  updatePlaybackControls();
+}
+
+function refreshPreview() {
+  if (!Module) {
+    return;
+  }
+  if (previewIndex >= 0 && previewIndex < Module._web_animation_count() && Module._web_is_ready()) {
+    Module._web_refresh_preview();
+  } else {
+    previewIndex = -1;
+    Module._web_refresh_preview();
+  }
+  markPreviewRow();
+  updatePlaybackControls();
+}
+
+function tickPlayback() {
+  updatePlaybackControls();
+  requestAnimationFrame(tickPlayback);
 }
 
 function fileNameFor(index) {
@@ -274,6 +341,17 @@ function wireEvents() {
     option.addEventListener('change', scheduleConfigure);
   }
   ui.showBones.addEventListener('change', () => Module._web_set_show_bones(ui.showBones.checked ? 1 : 0));
+  ui.play.addEventListener('click', () => {
+    Module._web_set_playing(Module._web_is_playing() ? 0 : 1);
+    updatePlaybackControls();
+  });
+  ui.frame.addEventListener('pointerdown', () => { scrubbing = true; });
+  ui.frame.addEventListener('pointerup', () => { scrubbing = false; });
+  ui.frame.addEventListener('input', () => {
+    Module._web_set_playing(0);
+    Module._web_set_frame(Number(ui.frame.value));
+    updatePlaybackControls();
+  });
   ui.resetCamera.addEventListener('click', () => Module._web_reset_camera());
   new ResizeObserver(resizeCanvas).observe(ui.canvasBox);
 }
@@ -300,6 +378,7 @@ async function start() {
   });
   wireEvents();
   resizeCanvas();
+  tickPlayback();
   await loadMapPreset(MAP_PRESETS[0].file);
   setStatus('open a source GLB and a destination GLB');
 }

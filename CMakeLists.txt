@@ -17,7 +17,9 @@ set_target_properties(json-c PROPERTIES
 
 set(TOOL_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/inc)
 set(WEB_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/web-tool/inc)
-set(WEB_LIB_SOURCES ${CMAKE_SOURCE_DIR}/web-tool/src/web_session.c)
+set(WEB_LIB_SOURCES
+  ${CMAKE_SOURCE_DIR}/web-tool/src/web_session.c
+  ${CMAKE_SOURCE_DIR}/web-tool/src/web_pose.c)
 set(THIRD_PARTY_INCLUDE_DIRS
   ${CMAKE_SOURCE_DIR}/third_party/cgltf
   ${CMAKE_SOURCE_DIR}/third_party/cglm/include)
