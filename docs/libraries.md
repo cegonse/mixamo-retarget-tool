@@ -72,6 +72,18 @@ Functions the specs rely on (`retargeting.md`):
 | Euler angles for the log line | `glm_euler_angles` (radians, XYZ) |
 | vectors | `glm_vec3_add/sub/scale/dot/cross/norm/normalize`, `glm_mat4_mulv3` |
 
+Measured behaviour (phase 1, pinned by `transform.test.cpp`):
+- `glm_quat_from_vecs` expects **unit** vectors and handles the
+  anti-parallel case itself (`glm_vec3_ortho` axis). It returns identity
+  when `dot ≥ 1 − FLT_EPSILON`, so near-parallel inputs are off by up to
+  ~5e-4 rad (0.03°) — harmless. `Transform_MinimalArc` normalises its
+  inputs and returns identity for a zero-length direction.
+- `glm_quat_slerp` negates on a negative dot in its main branch, but its
+  small-angle lerp fallback uses the **original** signs, so two nearly
+  opposite-sign quaternions lerp through ~zero. `Transform_QuatSlerp`
+  makes `to` sign-continuous with `from` first, then slerps and
+  normalises; always use it instead of calling `glm_quat_slerp` directly.
+
 Not in cglm, written in-house: the 4×4 symmetric **Jacobi eigen solver**
 used by the Horn/Umeyama frame alignment, cubic-spline keyframe
 evaluation, and the shear check on decomposed `matrix` nodes.
