@@ -91,8 +91,14 @@ translation — that maps source world space onto destination world space:
   root pair's rest position, §6).
 - `info`-style log line, always printed by `convert`:
   `frame: rotate (X°, Y°, Z°)  scale k  rms residual r`.
-  A large residual (> 10 % of the destination's joint spread) means the
-  map is wrong or the rest poses are not comparable; print a warning.
+  A large residual (> 20 % of the destination's joint spread, the RMS
+  distance of the mapped destination joints from their centroid) means
+  the map is wrong or the rest poses are not comparable; print a warning.
+  Measured on the real pair (`UAL1_Standard_RM` → `test_player`, phase 5):
+  `Q` = (−91.0°, 0.1°, 0.0°), `k` = 401.4, rms 34.5 against a spread of
+  260.3 (13 %) — the residual is genuine proportion difference (Mixamo
+  arms rest lower, feet wider), so the threshold was raised from the
+  originally planned 10 % to 20 % to keep the warning meaningful.
 - Overrides: `--frame-rotate X,Y,Z` (degrees, applied Z·Y·X) and
   `--frame-scale k` replace the solved values; `--no-frame-align` sets
   `Q = I, k = 1`.
