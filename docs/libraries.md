@@ -17,7 +17,11 @@ needed today; the only system library linked is `libm`.
 ## cgltf (read side)
 
 Single header; `#define CGLTF_IMPLEMENTATION` in **exactly one** `.c` file
-(`src/gltf_doc.c`), everywhere else plain `#include <cgltf.h>`.
+(`src/gltf_doc.c`), everywhere else plain `#include <cgltf.h>`. The
+implementation section has no include guard of its own, so in
+`gltf_doc.c` the `#define CGLTF_IMPLEMENTATION` / `#include <cgltf.h>`
+pair comes **after** every other include (project headers such as
+`gltf_doc_data.h` and `transform_node.h` pull in the declarations first).
 
 Calls used:
 - `cgltf_parse_file(&options, path, &data)` → `cgltf_load_buffers(&options,

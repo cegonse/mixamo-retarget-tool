@@ -42,6 +42,8 @@ endif()
 
 file(GLOB_RECURSE TEST_FILES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/test/*.test.cpp)
 
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test-output)
+
 add_custom_target(build_tests)
 
 foreach(TEST_FILE ${TEST_FILES})
