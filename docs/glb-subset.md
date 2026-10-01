@@ -168,21 +168,64 @@ one scene, root node `Armature` (identity TRS). Units are centimetres-ish
   `Armature` space, ≈ `(−3.6, 5.4, −388.5)`, first key == last key (loop),
   i.e. **in-place** motion (no root displacement).
 
-### `UAL1_Standard_RM.glb` — ⚠ currently NOT the animation library (144,852 bytes)
-Measured content: the same 27 nodes and Mixamo joint names as
-`test_player.glb`, the same mesh/materials/textures, and a single 2-key
-`"mixamo.com"` track (0.042 s). It is a near-duplicate of the destination
-model and contains **no library animations and no foreign skeleton**.
-
-Expected content (to be confirmed by running `info` on the real export):
-the Universal Animation Library "Standard" pack with root motion ("RM"):
-dozens of named tracks on a UE5-Mannequin-style skeleton (`root`,
-`pelvis`, `spine_01…05`, `neck_01`, `head`, `clavicle_l`, `upperarm_l`,
-`lowerarm_l`, `hand_l`, `thigh_l`, `calf_l`, `foot_l`, `ball_l` and the
-`_r` mirrors), A-pose rest, root motion carried by the `root` bone, Y-up
-after glTF export, metre-scale units.
-
-**Action for the user:** replace `test/data/UAL1_Standard_RM.glb` with the
-real export before `PLAN.md` phase 9. Until then every phase is testable
-with the other two fixtures plus synthetic transforms (see
-`testing-guidelines.md`).
+### `UAL1_Standard_RM.glb` — the source library (7,620,504 bytes)
+Exported by "Khronos glTF Blender I/O v4.5.48"; JSON chunk 2.09 MB, BIN
+5.75 MB, 8,090 accessors. Universal Animation Library "Standard" pack
+with root motion ("RM").
+- 67 nodes: `Armature` (node 66, identity) → `Mannequin` (node 65,
+  `mesh` 0, `skin` 0) and `root` (node 64, `R = (−0.7071, 0, 0, 0.7071)`,
+  no translation) with 64 descendants. **65 joints**, UE5-Mannequin
+  names, skin joint order starting `root, pelvis, spine_01, spine_02,
+  spine_03, neck_01, Head, clavicle_l, …`; `inverseBindMatrices`
+  accessor 14.
+  ```
+  root
+    pelvis
+      spine_01 → spine_02 → spine_03 → { neck_01 → Head,
+                                         clavicle_l → upperarm_l → lowerarm_l → hand_l → 5 fingers × (01, 02, 03, 04_leaf),
+                                         clavicle_r → … (mirror) }
+      thigh_l → calf_l → foot_l → ball_l → ball_leaf_l
+      thigh_r → calf_r → foot_r → ball_r → ball_leaf_r
+  ```
+  Note the capital `Head` and that the spine has three segments
+  (`spine_01..03`), one neck segment and 20 finger joints the destination
+  lacks.
+- Units are **metres**, glTF **+Y-up**: mesh bounds X ±0.972,
+  Y 0.0005…1.829, Z −0.164…0.205 — a 1.83 m character in **T-pose**
+  (arm span 1.94 m). `pelvis` rest `T = (0, 0.050, 0.917)` in `root`
+  space, i.e. world height 0.917 m. The `root` bone's −90° X rotation is
+  Blender's Z-up → Y-up conversion baked into the rig.
+- The rest pose **is** the T-pose: the track `A_TPose` holds the rest
+  rotations on every frame (verified on `upperarm_l`). Both rigs
+  therefore rest in T-pose; the rest-direction correction of
+  `retargeting.md` §4 only has to absorb small bone-axis differences.
+- 43 animations, every one with translation + rotation + scale LINEAR
+  channels for all 65 joints (195 channels), **30 fps, first key at
+  t = 0**, uniform 1/30 s spacing. Durations 0.167 s (`Pistol_Aim_*`) to
+  5.2 s (`Fixing_Kneeling`). Names: `A_TPose`, `Crouch_Fwd_Loop`,
+  `Crouch_Idle_Loop`, `Dance_Loop`, `Death01`, `Driving_Loop`,
+  `Fixing_Kneeling`, `Hit_Chest`, `Hit_Head`, `Idle_Loop`,
+  `Idle_Talking_Loop`, `Idle_Torch_Loop`, `Interact`, `Jog_Fwd_Loop`,
+  `Jump_Land`, `Jump_Loop`, `Jump_Start`, `PickUp_Table`,
+  `Pistol_Aim_Down/Neutral/Up`, `Pistol_Idle_Loop`, `Pistol_Reload`,
+  `Pistol_Shoot`, `Punch_Cross`, `Punch_Jab`, `Push_Loop`, `Roll`,
+  `Sitting_Enter/Exit/Idle_Loop/Talking_Loop`,
+  `Spell_Simple_Enter/Exit/Idle_Loop/Shoot`, `Sprint_Loop`,
+  `Swim_Fwd_Loop`, `Swim_Idle_Loop`, `Sword_Attack`, `Sword_Idle`,
+  `Walk_Formal_Loop`, `Walk_Loop`.
+- **Root motion** lives in the `root` bone's translation (parent =
+  `Armature` space, so it is a world displacement), along **+Z**; `pelvis`
+  translation stays constant within a track. Tracks that travel:
+  `Jog_Fwd_Loop` 5.0 m / 0.93 s, `Sprint_Loop` 5.5 m / 0.67 s, `Roll`
+  5.0 m, `Swim_Fwd_Loop` 2.9 m, `Crouch_Fwd_Loop` 1.5 m, `Sword_Attack`
+  1.5 m, `Walk_Loop` / `Walk_Formal_Loop` 1.3 m, `Push_Loop` 0.8 m,
+  `Death01` 0.65 m; all others stay at the origin. `sword_run.glb` is
+  in-place, so locomotion tracks will normally be converted with
+  `--in-place` (`retargeting.md` §6); `root` stays unmapped so its motion
+  folds into `mixamorig:Hips` when root motion is wanted.
+- Scale relation to the destination: height 1.83 m vs ~645 units
+  (×352), hips 0.917 m vs 413 units (×450). The proportions differ, so
+  the Procrustes `k` will land between the two; phase 9 decides whether
+  the hips-height ratio should override it for root translation
+  (`--frame-scale`).
+- 2 materials, no textures/images; mesh has `TEXCOORD_1`. All ignored.

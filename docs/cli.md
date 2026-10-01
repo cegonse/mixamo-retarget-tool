@@ -67,10 +67,10 @@ Arguments:
 Summary printed per track (stdout):
 
 ```
-track "Jog_Fwd": 61 frames @ 30 fps (2.000 s)
-  frame: rotate (-90.0°, 0.0°, 0.0°)  scale 100.00  rms 3.2
-  joints: 22 mapped, 3 source unmapped, 3 destination unmapped
-  wrote out/Jog_Fwd.glb (41,208 bytes)
+track "Jog_Fwd_Loop": 29 frames @ 30 fps (0.933 s)
+  frame: rotate (-90.0°, 0.0°, 0.0°)  scale 380.00  rms 3.2
+  joints: 24 mapped, 41 source unmapped, 1 destination unmapped
+  wrote out/Jog_Fwd_Loop.glb (41,208 bytes)
 ```
 
 Unknown track or bone names are errors that list what *is* available.
@@ -102,7 +102,9 @@ anim-retarget convert test/data/sword_run.glb test/data/test_player.glb \
 ```
 anim-retarget info test/data/UAL1_Standard_RM.glb        # discover names
 anim-retarget convert test/data/UAL1_Standard_RM.glb test/data/test_player.glb \
-  --all-anims --map-file docs/mappings/ual-to-mixamo.map --out-dir out/ual --in-place
+  --anim Jog_Fwd_Loop,Walk_Loop --map-file docs/mappings/ual-to-mixamo.map --out-dir out/ual --in-place
+anim-retarget convert test/data/UAL1_Standard_RM.glb test/data/test_player.glb \
+  --all-anims --map-file docs/mappings/ual-to-mixamo.map --out-dir out/ual
 ```
 
 `docs/mappings/` holds the maintained map files (identity map for the

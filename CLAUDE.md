@@ -13,7 +13,8 @@ different bone names, rest pose, world orientation and scale. The source
 may hold many tracks; the output is **one model-less GLB per track**.
 
 ```
-UAL1_Standard_RM.glb (N tracks, foreign rig) ──[anim-retarget]──▶ <track>.glb × N, on test_player.glb's rig
+UAL1_Standard_RM.glb (43 tracks, 65-joint UE-Mannequin rig, metres, +Y-up)
+        ──[anim-retarget]──▶  <track>.glb × 43, on test_player.glb's 25-joint Mixamo rig (−Z-up, ~cm)
 ```
 
 Two commands: `info` (list tracks + armature hierarchy) and `convert`
@@ -87,9 +88,10 @@ Full CLI in `docs/cli.md`.
    quaternions, no NaN ever written. Every produced file must parse back
    with cgltf and pass `cgltf_validate`.
 
-Known footgun: `UAL1_Standard_RM.glb` in `test/data/` is currently a
-duplicate of the destination model, not the animation library
-(`docs/glb-subset.md` §5). Phases 0–8 don't need it; phase 9 does.
+Useful fact: both rigs rest in T-pose (`A_TPose` in the library equals
+its rest pose), so the rest correction only absorbs small bone-axis
+differences; the big differences are up axis (+Y vs −Z), units (metres
+vs ~centimetres) and root motion (`root` bone vs in-place hips).
 
 ## Build
 

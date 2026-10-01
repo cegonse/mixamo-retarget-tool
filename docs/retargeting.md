@@ -99,6 +99,10 @@ translation — that maps source world space onto destination world space:
 
 Rest poses need not be the same pose (A vs T) for this to work: the
 torso and legs dominate the least-squares fit, and §4 cleans up the limbs.
+For the real pair the proportions differ (height ratio ×352, hips-height
+ratio ×450), so `k` is a compromise; if feet sink or float in-engine,
+`--frame-scale 450` (hips height) is the first thing to try, and phase 9
+may make the hips-height ratio the default for root translation.
 
 ## 4. Rest-pose correction (A-pose vs T-pose)
 
@@ -200,5 +204,6 @@ code for malformed output, never a silently written file).
    down (and the animation adjusted so the world motion is unchanged)
    → with rest alignment the result equals step 2 within ε on the arm
    joints. Proves §4.
-5. **Real library**: the UAL export → in-engine check next to
+5. **Real library**: `A_TPose` → destination rest within a few degrees
+   (automated); `Jog_Fwd_Loop`/`Idle_Loop` → in-engine check next to
    `sword_run.glb` (manual, `PLAN.md` phase 9).

@@ -22,14 +22,6 @@ fixture facts), `docs/retargeting.md` (math), `docs/libraries.md`
    user can run `/usage` and decide whether the next phase fits in the
    remaining budget. Never start the next phase in the same turn.
 
-## Known blocker (resolve before phase 9)
-
-`test/data/UAL1_Standard_RM.glb` is currently a near-duplicate of
-`test_player.glb` (same Mixamo rig, one 2-key placeholder track), not the
-animation library — see `docs/glb-subset.md` §5. Phases 0–8 need only the
-other two fixtures plus synthetic transforms built in tests. The user must
-drop in the real export before phase 9.
-
 ## Phases
 
 Each phase is one commit. Module names are the `inc/<name>.h` /
@@ -129,23 +121,25 @@ Each phase is one commit. Module names are the `inc/<name>.h` /
   `--map-file`, `--fps`, `--src-up`, overrides, `--verbose`, `#index`
   track selection, `--out` single-file rule); usage text; exit codes.
 - Synthetic frame-change acceptance test; multiple-track output test on
-  a synthetic two-track GLB built in the test (written with
-  `glb_writer`, read back with `gltf_doc`).
+  `UAL1_Standard_RM.glb` (`--anim Idle_Loop,Walk_Loop` → two files named
+  after the tracks; `--all-anims` → 43 files, each loads back and
+  validates).
 - `README.md` (what/why/build/run, link to docs).
 
-### Phase 9 — The real library (needs the real fixture)
-- User replaces `test/data/UAL1_Standard_RM.glb`; run `info`, fix the
-  left-hand names in `docs/mappings/ual-to-mixamo.map`, record the
-  measured facts in `docs/glb-subset.md` §5.
-- Convert a locomotion track (`--in-place`) and an upper-body track; load
-  them in the engine next to `sword_run.glb`. Check: facing, up axis,
-  scale of hips motion, arm rest (A/T), foot contact, loop seam, start
-  time 0 vs 1/30.
-- Fix what the engine reveals (likely candidates: `--src-up` default,
-  time offset, twist on hands/feet, `k` from Procrustes vs leg length);
-  add an acceptance test on the real fixture: `--all-anims` yields N
-  files, each loads, no non-finite values, hips stay within the
-  destination's height range.
+### Phase 9 — In-engine validation with the real library
+- Convert `Jog_Fwd_Loop` and `Walk_Loop` (`--in-place`) and `Idle_Loop`,
+  `Sword_Attack`, `Pistol_Idle_Loop` with
+  `docs/mappings/ual-to-mixamo.map`; load them in the engine next to
+  `sword_run.glb`. Check: facing, up axis, hips height and bob scale,
+  arm/hand twist, foot contact, loop seam, start time 0 vs 1/30.
+- Fix what the engine reveals (likely candidates: `k` from Procrustes vs
+  the hips-height ratio ×450, twist on hands/feet, time offset); record
+  each finding in `docs/glb-subset.md` / `docs/retargeting.md`.
+- Add an acceptance test on the real fixture: `--all-anims` yields 43
+  files, each loads and validates, no non-finite values, hips stay
+  within the destination's height range, and `A_TPose` converts to a
+  pose whose joint rotations equal the destination rest within a few
+  degrees.
 
 ### Phase 10 — Polish (optional)
 - `--bone-offset d=X,Y,Z` manual twist fix if phase 9 needs it.

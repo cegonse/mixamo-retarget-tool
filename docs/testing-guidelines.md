@@ -308,9 +308,11 @@ app is linked and run against the fixture GLBs, verifying input -> output.
   retargets it onto `test_player.glb`; the result must match the plain
   `sword_run → test_player` result within ε. This proves frame alignment
   without depending on the UAL fixture.
-- **convert, multiple tracks**: once the real UAL fixture is in place —
-  `--anim` with two names yields two files named after the tracks,
-  `--all-anims` yields one per track; each loads back and validates.
+- **convert, multiple tracks**: on `UAL1_Standard_RM.glb`, `--anim
+  Idle_Loop,Walk_Loop` yields two files named after the tracks,
+  `--all-anims` yields 43; each loads back and validates. `A_TPose`
+  converted onto `test_player.glb` gives rotations within a few degrees
+  of the destination rest pose.
 - **malformed input**: truncated/garbage GLB fails cleanly (non-zero exit,
   message on stderr, no crash under ASan).
 - Output files go to a temp directory under `build/`; tests clean up in
