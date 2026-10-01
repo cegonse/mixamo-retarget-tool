@@ -72,7 +72,10 @@ The developer's current machine (Linux x86_64) resolves to
   `toBe(x, epsilon)`, and for byte/buffer work: `toEqualBytes(expected)`,
   `toEqualMemory(ptr, len)`.
 - **Hooks** - `beforeEach`/`afterEach`, `beforeAll`/`afterAll`, one of each
-  per suite, reference-capture `[&]` to reach outer state.
+  per suite, reference-capture `[&]` to reach outer state. Shared state
+  must live at **file scope** (`static`), not as a local of the `describe`
+  lambda: `describe` returns before the tests run, so `[&]` on its locals
+  dangles (the binary then exits 1 with no output).
 - **Focus/skip** - `fit`/`xit`, `fdescribe`/`xdescribe`, `todo(...)`.
 - **Parametrized** - `withParameter<T>().withValue(...).thenDo([](T x){...})`
   for table-driven cases.

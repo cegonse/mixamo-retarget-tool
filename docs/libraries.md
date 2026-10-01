@@ -85,7 +85,10 @@ our `-Werror` build; set them as cache variables before the
 `add_subdirectory`). Link the `json-c` target; its interface include
 directories provide the headers, so the include form is `#include
 <json.h>` (the build-tree form; a system install would be
-`<json-c/json.h>` — not used).
+`<json-c/json.h>` — not used). `json.h` pulls in `linkhash.h`, whose
+unused `static` helpers fail `-Werror` when included from C++ tests, so
+the top-level CMakeLists marks json-c's interface includes (and cgltf/cglm)
+as `SYSTEM` include directories.
 
 Calls used (`glb_writer`):
 - Build: `json_object_new_object`, `json_object_object_add`,
